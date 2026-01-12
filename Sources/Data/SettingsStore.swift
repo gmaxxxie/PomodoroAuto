@@ -1,0 +1,63 @@
+import Foundation
+
+final class SettingsStore {
+    private enum Keys {
+        static let workMinutes = "workMinutes"
+        static let breakMinutes = "breakMinutes"
+        static let autoStart = "autoStart"
+        static let fullscreenNonWork = "fullscreenNonWork"
+        static let whitelistBundleIds = "whitelistBundleIds"
+        static let autoStartBundleIds = "autoStartBundleIds"
+    }
+
+    private let defaults = UserDefaults.standard
+
+    init() {
+        defaults.register(defaults: [
+            Keys.workMinutes: 25,
+            Keys.breakMinutes: 5,
+            Keys.autoStart: true,
+            Keys.fullscreenNonWork: true,
+            Keys.whitelistBundleIds: [],
+            Keys.autoStartBundleIds: []
+        ])
+    }
+
+    var workMinutes: Int {
+        get { defaults.integer(forKey: Keys.workMinutes) }
+        set { defaults.set(newValue, forKey: Keys.workMinutes) }
+    }
+
+    var breakMinutes: Int {
+        get { defaults.integer(forKey: Keys.breakMinutes) }
+        set { defaults.set(newValue, forKey: Keys.breakMinutes) }
+    }
+
+    var autoStart: Bool {
+        get { defaults.bool(forKey: Keys.autoStart) }
+        set { defaults.set(newValue, forKey: Keys.autoStart) }
+    }
+
+    var fullscreenNonWork: Bool {
+        get { defaults.bool(forKey: Keys.fullscreenNonWork) }
+        set { defaults.set(newValue, forKey: Keys.fullscreenNonWork) }
+    }
+
+    var whitelistBundleIds: [String] {
+        get { defaults.stringArray(forKey: Keys.whitelistBundleIds) ?? [] }
+        set { defaults.set(newValue, forKey: Keys.whitelistBundleIds) }
+    }
+
+    var autoStartBundleIds: [String] {
+        get { defaults.stringArray(forKey: Keys.autoStartBundleIds) ?? [] }
+        set { defaults.set(newValue, forKey: Keys.autoStartBundleIds) }
+    }
+
+    var ruleConfig: RuleConfig {
+        RuleConfig(
+            fullscreenNonWork: fullscreenNonWork,
+            whitelistBundleIds: Set(whitelistBundleIds),
+            autoStartBundleIds: Set(autoStartBundleIds)
+        )
+    }
+}

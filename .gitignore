@@ -1,0 +1,9 @@
+.build/
+PomodoroAuto.app/
+.DS_Store
+.swiftpm/
+.vscode/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
