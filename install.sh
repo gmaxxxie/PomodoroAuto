@@ -24,7 +24,7 @@ ARCH=$(uname -m)
 BUILD_DIR=".build/release"
 
 # Create app bundle
-APP_PATH="/Applications/PomodoroAuto.app"
+APP_PATH="$SCRIPT_DIR/PomodoroAuto.app"
 APP_CONTENTS="$APP_PATH/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
@@ -78,7 +78,7 @@ chmod +x "$APP_MACOS/PomodoroAuto"
 
 echo ""
 echo "✅ Build complete!"
-echo "📦 App installed to: $APP_PATH"
+echo "📦 App created at: $APP_PATH"
 echo ""
 echo "🚀 To run: open $APP_PATH"
 echo ""

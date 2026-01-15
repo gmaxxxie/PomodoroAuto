@@ -10,9 +10,10 @@ final class SettingsStore {
         static let autoStartBundleIds = "autoStartBundleIds"
     }
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         defaults.register(defaults: [
             Keys.workMinutes: 25,
             Keys.breakMinutes: 5,
@@ -59,5 +60,14 @@ final class SettingsStore {
             whitelistBundleIds: Set(whitelistBundleIds),
             autoStartBundleIds: Set(autoStartBundleIds)
         )
+    }
+
+    func resetToDefaults() {
+        defaults.removeObject(forKey: Keys.workMinutes)
+        defaults.removeObject(forKey: Keys.breakMinutes)
+        defaults.removeObject(forKey: Keys.autoStart)
+        defaults.removeObject(forKey: Keys.fullscreenNonWork)
+        defaults.removeObject(forKey: Keys.whitelistBundleIds)
+        defaults.removeObject(forKey: Keys.autoStartBundleIds)
     }
 }

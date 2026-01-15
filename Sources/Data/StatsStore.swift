@@ -66,4 +66,8 @@ final class StatsStore {
             defaults.set(data, forKey: key)
         }
     }
+
+    func clearAll() {
+        defaults.removeObject(forKey: key)
+    }
 }

@@ -1,153 +1,103 @@
 # AGENTS.md
 
-This file provides guidance for agentic coding assistants working on the PomodoroAuto codebase.
+This file provides context and guidelines for AI agents working on the PomodoroAuto codebase.
 
-## Build, Test, and Lint Commands
+## 1. Build & Test Commands
 
 ### Build
 ```bash
-swift build                      # Build the project
-swift build --configuration release   # Release build
+swift build                        # Debug build
+swift build -c release            # Release build
 ```
 
 ### Test
+**Always run tests after modifying logic.**
 ```bash
-swift test                       # Run all tests
-swift test --filter TestClassName.testMethodName  # Run single test
-swift test --verbose             # Run with verbose output
+swift test                        # Run all tests
+swift test --filter <TestClass>   # Run specific test class
+swift test --filter <TestClass>.<testMethod> # Run specific test case
 ```
 
 Examples:
 ```bash
+swift test --filter RuleEngineTests
 swift test --filter RuleEngineTests.testAutoStartAllowlistBlocksOtherApps
-swift test --filter StatsStoreTests
 ```
 
-### Lint
-No linting tools are currently configured. If adding linting, consider SwiftLint.
+### Linting
+No linter is currently configured. Follow the code style guidelines below strictly.
 
-## Code Style Guidelines
+## 2. Code Style & Conventions
 
-### Imports
-- Organize imports alphabetically
-- No unused imports
-- Group by platform (Foundation, AppKit, etc.) when multiple imports exist
+### General
+- **Indentation**: 4 spaces.
+- **Access Control**: Use `private` for internal properties/methods. Default to internal.
+- **Final Classes**: Mark classes as `final` unless inheritance is required.
+- **Imports**: Alphabetical order. Group system frameworks (Foundation, AppKit) separately.
 
-### Types and Classes
-- Use `final class` for classes that don't need inheritance
-- Use `struct` for data models and value types
-- Use private init? = nil for unsupported NSCoder conformance in NSWindowController
+### Naming
+- **Types**: `PascalCase` (e.g., `PomodoroTimer`, `MenuBarController`).
+- **Variables/Functions**: `camelCase` (e.g., `remainingSeconds`, `startTimer`).
+- **Constants**: `camelCase`, typically inside a `private enum Keys` or similar namespace.
+- **Test Methods**: `test` prefix + `CamelCase` (e.g., `testTimerResetsCorrectly`).
 
-### Naming Conventions
-- **Functions/Variables**: `camelCase` (e.g., `handleSave`, `workTimer`)
-- **Types**: `PascalCase` (e.g., `MenuBarController`, `RuleConfig`)
-- **Constants/Keys**: `camelCase` within private enum (e.g., `Keys.workMinutes`)
-- **Test Methods**: `camelCase` prefixed with `test` (e.g., `testAutoStartAllowlistBlocksOtherApps`)
+### Memory Management (CRITICAL)
+- **Weak Self**: Always use `[weak self]` in closures (timers, callbacks, notifications) to avoid retain cycles.
+- **Guard Self**: Use `guard let self = self else { return }` at the start of closures if `self` is required.
 
-### Formatting
-- Use 4 spaces for indentation (Swift default)
-- No trailing whitespace
-- Default access control is preferred for internal members
-- Private members should be explicitly marked `private`
-- Use guard statements for early exits and validation
-- Avoid force unwrapping (!) unless safe; prefer optional binding
+```swift
+timer.setEventHandler { [weak self] in
+    guard let self = self else { return }
+    self.tick()
+}
+```
 
 ### Error Handling
-- Use `guard` statements for precondition validation
-- Return early from functions when invalid state is detected
-- Use optional binding (`if let`, `guard let`) for unwrapping
-- Use `??` operator for default values with optionals
+- **Guard**: Use `guard` for early exits and precondition checks.
+- **Optionals**: Prefer optional binding (`if let`, `guard let`) over force unwrapping (`!`).
+- **Defaults**: Use `??` for default values.
 
-### Memory Management
-- Always use `[weak self]` in closures to prevent retain cycles
-- Capture lists: `timer.setEventHandler { [weak self] in ... }`
-- Use `guard let self = self else { return }` pattern when needed
+## 3. Architecture & Patterns
 
-### Code Organization
-- Sources organized by feature: `Core/`, `App/`, `Data/`
-- Related types grouped in files by domain
-- Tests mirror source structure in `Tests/PomodoroAutoTests/`
+### Core Components
+- **PomodoroTimer**: Handles the countdown logic using `DispatchSourceTimer`.
+- **RuleEngine**: Determines if the current state is "Work" or "Rest" based on active apps/windows.
+- **MenuBarController**: Manages the macOS menu bar UI (NSStatusItem).
+
+### Data Flow
+1. **Timer** ticks every second.
+2. **FocusStateDetector** checks the frontmost app.
+3. **RuleEngine** evaluates if it's work or distraction.
+4. **PomodoroTimer** updates state (Running/Paused).
+5. **MenuBarController** updates the UI.
 
 ### UserDefaults Pattern
+Encapsulate keys and accessors:
 ```swift
 private enum Keys {
-    static let settingName = "settingName"
+    static let workMinutes = "workMinutes"
 }
-
-private let defaults = UserDefaults.standard
-
-var settingName: Type {
-    get { defaults.type(forKey: Keys.settingName) }
-    set { defaults.set(newValue, forKey: Keys.settingName) }
-}
-
-init() {
-    defaults.register(defaults: [Keys.settingName: defaultValue])
+var workMinutes: Int {
+    get { UserDefaults.standard.integer(forKey: Keys.workMinutes) }
+    set { UserDefaults.standard.set(newValue, forKey: Keys.workMinutes) }
 }
 ```
 
-### Dependency Injection
-- Inject dependencies via init for testability
-- Default parameters can use standard implementations:
-```swift
-init(defaults: UserDefaults = .standard, key: String = "statsByDay")
-```
+### UI Development (AppKit)
+- **Programmatic UI**: Prefer code over XIB/Storyboards.
+- **Auto Layout**: Use `NSLayoutConstraint.activate([...])`.
+- **System Icons**: Use `NSImage(systemSymbolName: ...)` (SF Symbols).
 
-### Timer and Async Operations
-- Use `DispatchSourceTimer` for recurring timers
-- Schedule on `DispatchQueue.main` for UI updates
-```swift
-let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
-timer.schedule(deadline: .now() + 1, repeating: .seconds(1))
-timer.setEventHandler { [weak self] in ... }
-timer.resume()
-```
+## 4. Project Structure
 
-### Callback Pattern
-Use optional closure properties for event callbacks:
-```swift
-var onTick: ((Int) -> Void)?
-var onComplete: (() -> Void)?
-```
+- `Sources/Core/`: Business logic (Timer, Rules, State).
+- `Sources/App/`: UI and Application lifecycle (AppDelegate, MenuBar).
+- `Sources/Data/`: Persistence (UserDefaults, FileSystem).
+- `Tests/PomodoroAutoTests/`: Unit tests mirroring the source structure.
 
-### Testing
-- Use XCTest framework
-- Import with `@testable import PomodoroAuto`
-- Use isolated UserDefaults for tests:
-```swift
-let suiteName = "PomodoroAutoTests.StatsStore"
-let defaults = UserDefaults(suiteName: suiteName)!
-defaults.removePersistentDomain(forName: suiteName)
-```
+## 5. Agent Behavior Guidelines
 
-### Accessibility and macOS APIs
-- Request accessibility permissions before using AX APIs
-- Check trust with `AXIsProcessTrusted()`
-- Use ApplicationServices framework for AX APIs
-- Get frontmost app with `NSWorkspace.shared.frontmostApplication`
-
-### UI Components
-- Use NSStackView for layout
-- Use Auto Layout constraints with `translatesAutoresizingMaskIntoConstraints = false`
-- Window positioning uses `screen.visibleFrame` and margins
-- System icons via `NSImage(systemSymbolName:accessibilityDescription:)`
-
-### Notifications
-- Use UNUserNotificationCenter for system notifications
-- Set delegate to handle foreground presentation
-- Request authorization at app launch
-
-## Project Structure
-
-- `Sources/Core/` - Core logic: timer, state detection, rule engine
-- `Sources/App/` - UI: menu bar, windows, app delegate
-- `Sources/Data/` - Persistence: settings, stats, cache
-- `Tests/PomodoroAutoTests/` - Unit tests
-
-## Key Design Decisions
-
-- No screen recording - only reads foreground window state via Accessibility API
-- State machine: Idle, Running, Paused, Completed, Resting
-- Stats stored by date key (YYYY-MM-DD) in UserDefaults
-- FIFO cache with retention limits for state snapshots
-- Safari fullscreen always treated as non-work (hardcoded rule)
+1. **Verify Changes**: Run relevant tests after every change.
+2. **Keep It Simple**: Do not over-engineer. Follow existing patterns.
+3. **No Screen Recording**: The app uses Accessibility APIs, not screen recording. Do not suggest screen recording permissions.
+4. **Swift 5.9+**: Use modern Swift concurrency features if applicable, but stick to DispatchSourceTimer for precise timing as currently implemented.
