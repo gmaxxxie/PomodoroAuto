@@ -1,14 +1,18 @@
 import AppKit
+import QuartzCore
 
 final class StatsWindowController: NSWindowController, NSWindowDelegate {
     private let statsStore: StatsStore
     private var workTimeValueLabel: NSTextField?
     private var pomodoroValueLabel: NSTextField?
+    private var progressRingLayer: CAShapeLayer?
+    private var motivationLabel: NSTextField?
+    private let dailyGoalPomodoros = 8
 
     init(statsStore: StatsStore) {
         self.statsStore = statsStore
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 280, height: 260),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 380),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -40,7 +44,11 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
     func updateStats() {
         let stats = statsStore.statsForToday()
         workTimeValueLabel?.stringValue = formatDuration(stats.workSeconds)
-        pomodoroValueLabel?.stringValue = String(stats.pomodoroCount)
+        pomodoroValueLabel?.stringValue = "\(stats.pomodoroCount)"
+
+        let progress = min(1.0, CGFloat(stats.pomodoroCount) / CGFloat(dailyGoalPomodoros))
+        updateProgressRing(progress: progress)
+        updateMotivation(pomodoroCount: stats.pomodoroCount)
     }
 
     private func buildContent() {
@@ -53,39 +61,25 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         backgroundView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(backgroundView)
 
-        let cardView = NSVisualEffectView()
-        cardView.material = .popover
-        cardView.state = .active
-        cardView.wantsLayer = true
-        cardView.layer?.cornerRadius = 16
-        cardView.layer?.shadowColor = NSColor.black.cgColor
-        cardView.layer?.shadowOpacity = 0.15
-        cardView.layer?.shadowOffset = NSSize(width: 0, height: -2)
-        cardView.layer?.shadowRadius = 20
-        cardView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(cardView)
+        let mainStack = NSStackView()
+        mainStack.orientation = .vertical
+        mainStack.alignment = .centerX
+        mainStack.spacing = 24
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(mainStack)
 
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 20
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        cardView.addSubview(stack)
+        let progressRingView = createProgressRing()
+        mainStack.addArrangedSubview(progressRingView)
 
-        let heading = createHeading(title: "Today", symbolName: "calendar")
-        stack.addArrangedSubview(heading)
+        let statsCard = createStatsCard()
+        mainStack.addArrangedSubview(statsCard)
 
-        let divider = NSBox()
-        divider.boxType = .separator
-        divider.translatesAutoresizingMaskIntoConstraints = false
-        divider.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        stack.addArrangedSubview(divider)
-
-        let workRow = createStatRow(label: "Work time", symbolName: "clock")
-        stack.addArrangedSubview(workRow)
-
-        let pomodoroRow = createStatRow(label: "Pomodoros", symbolName: "checkmark.circle.fill")
-        stack.addArrangedSubview(pomodoroRow)
+        let motivation = NSTextField(labelWithString: "Keep going!")
+        motivation.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        motivation.textColor = .secondaryLabelColor
+        motivation.alignment = .center
+        motivationLabel = motivation
+        mainStack.addArrangedSubview(motivation)
 
         NSLayoutConstraint.activate([
             backgroundView.topAnchor.constraint(equalTo: contentView.topAnchor),
@@ -93,107 +87,191 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
             backgroundView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-            cardView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            cardView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 30),
-            cardView.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -30),
-            cardView.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: 30),
-            cardView.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -30),
-
-            stack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -24),
-            stack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 24),
-            stack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -24)
+            mainStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            mainStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            mainStack.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 24),
+            mainStack.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -24)
         ])
     }
 
-    private func createHeading(title: String, symbolName: String) -> NSStackView {
+    private func createProgressRing() -> NSView {
+        let size: CGFloat = 140
+        let lineWidth: CGFloat = 10
+
+        let container = NSView()
+        container.wantsLayer = true
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            container.widthAnchor.constraint(equalToConstant: size),
+            container.heightAnchor.constraint(equalToConstant: size)
+        ])
+
+        let center = CGPoint(x: size / 2, y: size / 2)
+        let radius = (size - lineWidth) / 2
+
+        let bgPath = CGMutablePath()
+        bgPath.addArc(center: center, radius: radius, startAngle: 0, endAngle: .pi * 2, clockwise: false)
+
+        let bgLayer = CAShapeLayer()
+        bgLayer.path = bgPath
+        bgLayer.fillColor = nil
+        bgLayer.strokeColor = NSColor.tertiaryLabelColor.cgColor
+        bgLayer.lineWidth = lineWidth
+        bgLayer.lineCap = .round
+        bgLayer.frame = CGRect(x: 0, y: 0, width: size, height: size)
+        container.layer?.addSublayer(bgLayer)
+
+        let progressPath = CGMutablePath()
+        progressPath.addArc(center: center, radius: radius, startAngle: .pi / 2, endAngle: -.pi * 1.5, clockwise: true)
+
+        let progressLayer = CAShapeLayer()
+        progressLayer.path = progressPath
+        progressLayer.fillColor = nil
+        progressLayer.strokeColor = NSColor.systemGreen.cgColor
+        progressLayer.lineWidth = lineWidth
+        progressLayer.lineCap = .round
+        progressLayer.strokeEnd = 0
+        progressLayer.frame = CGRect(x: 0, y: 0, width: size, height: size)
+        container.layer?.addSublayer(progressLayer)
+        progressRingLayer = progressLayer
+
+        let centerLabel = NSTextField(labelWithString: "0/\(dailyGoalPomodoros)")
+        centerLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 24, weight: .bold)
+        centerLabel.textColor = .labelColor
+        centerLabel.alignment = .center
+        centerLabel.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(centerLabel)
+        pomodoroValueLabel = centerLabel
+
+        let subtitleLabel = NSTextField(labelWithString: "pomodoros")
+        subtitleLabel.font = NSFont.systemFont(ofSize: 11)
+        subtitleLabel.textColor = .tertiaryLabelColor
+        subtitleLabel.alignment = .center
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(subtitleLabel)
+
+        NSLayoutConstraint.activate([
+            centerLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            centerLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -8),
+            subtitleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            subtitleLabel.topAnchor.constraint(equalTo: centerLabel.bottomAnchor, constant: 2)
+        ])
+
+        return container
+    }
+
+    private func createStatsCard() -> NSView {
+        let card = NSVisualEffectView()
+        card.material = .popover
+        card.state = .active
+        card.wantsLayer = true
+        card.layer?.cornerRadius = 14
+        card.translatesAutoresizingMaskIntoConstraints = false
+
         let stack = NSStackView()
         stack.orientation = .horizontal
         stack.alignment = .centerY
-        stack.spacing = 10
+        stack.spacing = 16
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(stack)
 
-        let iconContainer = NSView()
-        iconContainer.wantsLayer = true
-        iconContainer.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
-        iconContainer.layer?.cornerRadius = 10
-        iconContainer.translatesAutoresizingMaskIntoConstraints = false
-        iconContainer.widthAnchor.constraint(equalToConstant: 36).isActive = true
-        iconContainer.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        let iconView = createStatIcon(symbolName: "clock.fill", color: .systemBlue)
+        stack.addArrangedSubview(iconView)
 
-        let imageView = NSImageView()
-        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: title) {
-            image.isTemplate = true
-            imageView.contentTintColor = .white
-            imageView.image = image
-        }
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        iconContainer.addSubview(imageView)
+        let textStack = NSStackView()
+        textStack.orientation = .vertical
+        textStack.alignment = .leading
+        textStack.spacing = 2
+
+        let labelView = NSTextField(labelWithString: "Total work time")
+        labelView.font = NSFont.systemFont(ofSize: 12)
+        labelView.textColor = .secondaryLabelColor
+
+        let valueView = NSTextField(labelWithString: "--:--")
+        valueView.font = NSFont.monospacedDigitSystemFont(ofSize: 20, weight: .semibold)
+        valueView.textColor = .labelColor
+        workTimeValueLabel = valueView
+
+        textStack.addArrangedSubview(labelView)
+        textStack.addArrangedSubview(valueView)
+        stack.addArrangedSubview(textStack)
 
         NSLayoutConstraint.activate([
-            imageView.centerXAnchor.constraint(equalTo: iconContainer.centerXAnchor),
-            imageView.centerYAnchor.constraint(equalTo: iconContainer.centerYAnchor),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
+            card.widthAnchor.constraint(greaterThanOrEqualToConstant: 220)
+        ])
+
+        return card
+    }
+
+    private func createStatIcon(symbolName: String, color: NSColor) -> NSView {
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.backgroundColor = color.withAlphaComponent(0.15).cgColor
+        container.layer?.cornerRadius = 10
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        let imageView = NSImageView()
+        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
+            image.isTemplate = true
+            imageView.image = image
+            imageView.contentTintColor = color
+        }
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(imageView)
+
+        NSLayoutConstraint.activate([
+            container.widthAnchor.constraint(equalToConstant: 40),
+            container.heightAnchor.constraint(equalToConstant: 40),
+            imageView.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             imageView.widthAnchor.constraint(equalToConstant: 20),
             imageView.heightAnchor.constraint(equalToConstant: 20)
         ])
 
-        let label = NSTextField(labelWithString: title)
-        label.font = NSFont.boldSystemFont(ofSize: 16)
-
-        stack.addArrangedSubview(iconContainer)
-        stack.addArrangedSubview(label)
-
-        return stack
+        return container
     }
 
-    private func createStatRow(label: String, symbolName: String) -> NSStackView {
-        let stack = NSStackView()
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 12
+    private func updateProgressRing(progress: CGFloat) {
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(0.5)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+        progressRingLayer?.strokeEnd = progress
 
-        let iconView = NSView()
-        iconView.wantsLayer = true
-        iconView.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.15).cgColor
-        iconView.layer?.cornerRadius = 8
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.widthAnchor.constraint(equalToConstant: 32).isActive = true
-        iconView.heightAnchor.constraint(equalToConstant: 32).isActive = true
-
-        let imageView = NSImageView()
-        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: label) {
-            image.isTemplate = true
-            imageView.image = image
+        let color: NSColor
+        if progress >= 1.0 {
+            color = .systemGreen
+        } else if progress >= 0.5 {
+            color = .systemBlue
+        } else if progress > 0 {
+            color = .systemOrange
+        } else {
+            color = .tertiaryLabelColor
         }
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.addSubview(imageView)
+        progressRingLayer?.strokeColor = color.cgColor
+        CATransaction.commit()
+    }
 
-        NSLayoutConstraint.activate([
-            imageView.centerXAnchor.constraint(equalTo: iconView.centerXAnchor),
-            imageView.centerYAnchor.constraint(equalTo: iconView.centerYAnchor),
-            imageView.widthAnchor.constraint(equalToConstant: 18),
-            imageView.heightAnchor.constraint(equalToConstant: 18)
-        ])
-
-        let labelView = NSTextField(labelWithString: label)
-        labelView.font = NSFont.systemFont(ofSize: 13)
-        labelView.textColor = .secondaryLabelColor
-
-        let valueView = NSTextField(labelWithString: "--")
-        valueView.font = NSFont.monospacedSystemFont(ofSize: 16, weight: .medium)
-        valueView.textColor = .labelColor
-
-        if label == "Work time" {
-            workTimeValueLabel = valueView
-        } else if label == "Pomodoros" {
-            pomodoroValueLabel = valueView
+    private func updateMotivation(pomodoroCount: Int) {
+        let message: String
+        if pomodoroCount == 0 {
+            message = "Start your first pomodoro!"
+        } else if pomodoroCount < dailyGoalPomodoros / 2 {
+            message = "Good start! Keep it up!"
+        } else if pomodoroCount < dailyGoalPomodoros {
+            message = "Halfway there! You're doing great!"
+        } else if pomodoroCount == dailyGoalPomodoros {
+            message = "Goal achieved! Amazing work!"
+        } else {
+            message = "Above and beyond! You're on fire!"
         }
+        motivationLabel?.stringValue = message
 
-        stack.addArrangedSubview(iconView)
-        stack.addArrangedSubview(labelView)
-        stack.addArrangedSubview(valueView)
-
-        return stack
+        pomodoroValueLabel?.stringValue = "\(pomodoroCount)/\(dailyGoalPomodoros)"
     }
 
     private func formatDuration(_ seconds: Int) -> String {
@@ -202,7 +280,7 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         let minutes = (clamped % 3600) / 60
         let secs = clamped % 60
         if hours > 0 {
-            return String(format: "%02d:%02d:%02d", hours, minutes, secs)
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
         }
         return String(format: "%02d:%02d", minutes, secs)
     }

@@ -1,23 +1,34 @@
 import AppKit
 
-final class SettingsWindowController: NSWindowController {
+final class SettingsWindowController: NSWindowController, NSMenuDelegate {
     private let settings: SettingsStore
+    private let statsStore: StatsStore
     private let onSave: () -> Void
 
     private let workMinutesField = NSTextField()
     private let breakMinutesField = NSTextField()
     private let autoStartCheckbox = NSButton(checkboxWithTitle: "Auto start/pause", target: nil, action: nil)
     private let autoStartAppsField = NSTextField()
+    private let autoStartAppPopup = NSPopUpButton()
+    private let autoStartSearchField = NSSearchField()
     private let fullscreenRuleCheckbox = NSButton(checkboxWithTitle: "Fullscreen non-work", target: nil, action: nil)
     private let whitelistField = NSTextField()
-    private let autoStartPickButton = NSButton()
-    private let whitelistPickButton = NSButton()
+    private let whitelistAppPopup = NSPopUpButton()
+    private let whitelistSearchField = NSSearchField()
+    private var installedAppsCache: [AppInfo] = []
 
-    init(settings: SettingsStore, onSave: @escaping () -> Void) {
+    private struct AppInfo {
+        let name: String
+        let bundleId: String
+        let icon: NSImage?
+    }
+
+    init(settings: SettingsStore, statsStore: StatsStore, onSave: @escaping () -> Void) {
         self.settings = settings
+        self.statsStore = statsStore
         self.onSave = onSave
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 600),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -64,22 +75,25 @@ final class SettingsWindowController: NSWindowController {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
 
         let documentView = NSView()
+        documentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = documentView
 
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 24
+        stack.spacing = 20
         stack.translatesAutoresizingMaskIntoConstraints = false
         documentView.addSubview(stack)
 
-        let timingSection = createTimingSection()
-        let autoStartSection = createAutoStartSection()
-        let fullscreenSection = createFullscreenSection()
+        let timingSection = createCardSection(content: createTimingSection())
+        let autoStartSection = createCardSection(content: createAutoStartSection())
+        let fullscreenSection = createCardSection(content: createFullscreenSection())
+        let resetSection = createCardSection(content: createResetSection())
 
         stack.addArrangedSubview(timingSection)
         stack.addArrangedSubview(autoStartSection)
         stack.addArrangedSubview(fullscreenSection)
+        stack.addArrangedSubview(resetSection)
 
         let saveButton = createModernButton(title: "Save", symbolName: "checkmark.circle.fill")
         saveButton.target = self
@@ -100,6 +114,12 @@ final class SettingsWindowController: NSWindowController {
             scrollView.topAnchor.constraint(equalTo: contentView.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
+            documentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            documentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            documentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            documentView.bottomAnchor.constraint(equalTo: scrollView.contentView.bottomAnchor),
+            documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+
             stack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 28),
             stack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -28),
             stack.topAnchor.constraint(equalTo: documentView.topAnchor, constant: 30),
@@ -115,16 +135,23 @@ final class SettingsWindowController: NSWindowController {
         let section = NSStackView()
         section.orientation = .vertical
         section.alignment = .leading
-        section.spacing = 12
+        section.spacing = 16
 
-        let title = createSectionTitle(title: "Timing", symbolName: "clock")
+        let title = createSectionTitle(title: "Timing", symbolName: "clock", color: .systemGreen)
         section.addArrangedSubview(title)
+
+        let fieldsStack = NSStackView()
+        fieldsStack.orientation = .horizontal
+        fieldsStack.alignment = .top
+        fieldsStack.spacing = 24
 
         let workRow = createLabeledRow(label: "Work minutes", field: workMinutesField, placeholder: "25")
         let breakRow = createLabeledRow(label: "Break minutes", field: breakMinutesField, placeholder: "5")
 
-        section.addArrangedSubview(workRow)
-        section.addArrangedSubview(breakRow)
+        fieldsStack.addArrangedSubview(workRow)
+        fieldsStack.addArrangedSubview(breakRow)
+
+        section.addArrangedSubview(fieldsStack)
 
         return section
     }
@@ -133,9 +160,9 @@ final class SettingsWindowController: NSWindowController {
         let section = NSStackView()
         section.orientation = .vertical
         section.alignment = .leading
-        section.spacing = 12
+        section.spacing = 14
 
-        let title = createSectionTitle(title: "Auto Start", symbolName: "play.circle.fill")
+        let title = createSectionTitle(title: "Auto Start", symbolName: "play.circle.fill", color: .systemBlue)
         section.addArrangedSubview(title)
 
         autoStartCheckbox.controlSize = .regular
@@ -145,7 +172,13 @@ final class SettingsWindowController: NSWindowController {
         let appsLabel = createInfoLabel(text: "Auto-start allowlist (comma-separated)")
         section.addArrangedSubview(appsLabel)
 
-        let appsRow = createButtonFieldRow(field: autoStartAppsField, button: autoStartPickButton, placeholder: "com.apple.Terminal, com.apple.dt.Xcode")
+        let appsRow = createPopupFieldRow(
+            field: autoStartAppsField,
+            popup: autoStartAppPopup,
+            placeholder: "com.apple.Terminal, com.apple.dt.Xcode",
+            searchField: autoStartSearchField,
+            menuTitle: "autoStartApps"
+        )
         section.addArrangedSubview(appsRow)
 
         return section
@@ -155,9 +188,9 @@ final class SettingsWindowController: NSWindowController {
         let section = NSStackView()
         section.orientation = .vertical
         section.alignment = .leading
-        section.spacing = 12
+        section.spacing = 14
 
-        let title = createSectionTitle(title: "Fullscreen Rules", symbolName: "rectangle.on.rectangle")
+        let title = createSectionTitle(title: "Fullscreen Rules", symbolName: "rectangle.on.rectangle", color: .systemPurple)
         section.addArrangedSubview(title)
 
         fullscreenRuleCheckbox.controlSize = .regular
@@ -167,7 +200,13 @@ final class SettingsWindowController: NSWindowController {
         let whitelistLabel = createInfoLabel(text: "Fullscreen work allowlist (comma-separated)")
         section.addArrangedSubview(whitelistLabel)
 
-        let whitelistRow = createButtonFieldRow(field: whitelistField, button: whitelistPickButton, placeholder: "com.apple.TextEdit")
+        let whitelistRow = createPopupFieldRow(
+            field: whitelistField,
+            popup: whitelistAppPopup,
+            placeholder: "com.apple.TextEdit",
+            searchField: whitelistSearchField,
+            menuTitle: "whitelistApps"
+        )
         section.addArrangedSubview(whitelistRow)
 
         let note = createNoteLabel(text: "Note: Safari fullscreen is always treated as non-work.")
@@ -176,42 +215,164 @@ final class SettingsWindowController: NSWindowController {
         return section
     }
 
-    private func createSectionTitle(title: String, symbolName: String) -> NSStackView {
+    private func createResetSection() -> NSStackView {
+        let section = NSStackView()
+        section.orientation = .vertical
+        section.alignment = .leading
+        section.spacing = 14
+
+        let title = createSectionTitle(title: "Reset", symbolName: "arrow.counterclockwise", color: .systemRed)
+        section.addArrangedSubview(title)
+
+        let description = createNoteLabel(text: "Reset all settings to defaults and clear all history records. This action cannot be undone.")
+        section.addArrangedSubview(description)
+
+        let resetButton = createDangerButton(title: "Reset All Data", symbolName: "trash")
+        resetButton.target = self
+        resetButton.action = #selector(handleResetAllData)
+        section.addArrangedSubview(resetButton)
+
+        return section
+    }
+
+    private func createDangerButton(title: String, symbolName: String) -> NSButton {
+        let button = NSButton()
+        button.title = title
+        button.bezelStyle = .rounded
+        button.controlSize = .regular
+
+        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: title) {
+            image.isTemplate = true
+            button.image = image
+            button.imagePosition = .imageLeading
+        }
+
+        button.contentTintColor = NSColor.systemRed
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 8
+
+        return button
+    }
+
+    @objc private func handleResetAllData() {
+        guard let window = self.window else { return }
+
+        let firstAlert = NSAlert()
+        firstAlert.messageText = "Reset All Data?"
+        firstAlert.informativeText = "This will reset all settings to defaults and clear all history records."
+        firstAlert.alertStyle = .warning
+        firstAlert.addButton(withTitle: "Continue")
+        firstAlert.addButton(withTitle: "Cancel")
+
+        firstAlert.beginSheetModal(for: window) { [weak self] response in
+            guard let self = self else { return }
+            if response == .alertFirstButtonReturn {
+                self.showSecondConfirmation()
+            }
+        }
+    }
+
+    private func showSecondConfirmation() {
+        guard let window = self.window else { return }
+
+        let secondAlert = NSAlert()
+        secondAlert.messageText = "Are you absolutely sure?"
+        secondAlert.informativeText = "All your settings and history will be permanently deleted. This cannot be undone."
+        secondAlert.alertStyle = .critical
+        secondAlert.addButton(withTitle: "Reset All Data")
+        secondAlert.addButton(withTitle: "Cancel")
+
+        secondAlert.beginSheetModal(for: window) { [weak self] response in
+            guard let self = self else { return }
+            if response == .alertFirstButtonReturn {
+                self.performReset()
+            }
+        }
+    }
+
+    private func performReset() {
+        settings.resetToDefaults()
+        statsStore.clearAll()
+        loadValues()
+        onSave()
+    }
+
+    private func createCardSection(content: NSStackView) -> NSView {
+        let card = NSVisualEffectView()
+        card.material = .popover
+        card.state = .active
+        card.wantsLayer = true
+        card.layer?.cornerRadius = 12
+        card.layer?.masksToBounds = true
+        card.translatesAutoresizingMaskIntoConstraints = false
+
+        let shadowContainer = NSView()
+        shadowContainer.wantsLayer = true
+        shadowContainer.layer?.shadowColor = NSColor.black.cgColor
+        shadowContainer.layer?.shadowOpacity = 0.08
+        shadowContainer.layer?.shadowOffset = NSSize(width: 0, height: -2)
+        shadowContainer.layer?.shadowRadius = 8
+        shadowContainer.translatesAutoresizingMaskIntoConstraints = false
+
+        content.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(content)
+
+        shadowContainer.addSubview(card)
+
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20),
+            content.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
+            content.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            content.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
+
+            card.leadingAnchor.constraint(equalTo: shadowContainer.leadingAnchor),
+            card.trailingAnchor.constraint(equalTo: shadowContainer.trailingAnchor),
+            card.topAnchor.constraint(equalTo: shadowContainer.topAnchor),
+            card.bottomAnchor.constraint(equalTo: shadowContainer.bottomAnchor)
+        ])
+
+        return shadowContainer
+    }
+
+    private func createSectionTitle(title: String, symbolName: String, color: NSColor = .controlAccentColor) -> NSStackView {
         let stack = NSStackView()
         stack.orientation = .horizontal
         stack.alignment = .centerY
-        stack.spacing = 8
+        stack.spacing = 10
+
+        let iconContainer = NSView()
+        iconContainer.wantsLayer = true
+        iconContainer.layer?.backgroundColor = color.withAlphaComponent(0.15).cgColor
+        iconContainer.layer?.cornerRadius = 8
+        iconContainer.translatesAutoresizingMaskIntoConstraints = false
 
         let imageView = NSImageView()
         if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: title) {
             image.isTemplate = true
             imageView.image = image
+            imageView.contentTintColor = color
             imageView.imageScaling = .scaleProportionallyUpOrDown
         }
-        imageView.widthAnchor.constraint(equalToConstant: 20).isActive = true
-        imageView.heightAnchor.constraint(equalToConstant: 20).isActive = true
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        iconContainer.addSubview(imageView)
+
+        NSLayoutConstraint.activate([
+            iconContainer.widthAnchor.constraint(equalToConstant: 28),
+            iconContainer.heightAnchor.constraint(equalToConstant: 28),
+            imageView.centerXAnchor.constraint(equalTo: iconContainer.centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: iconContainer.centerYAnchor),
+            imageView.widthAnchor.constraint(equalToConstant: 16),
+            imageView.heightAnchor.constraint(equalToConstant: 16)
+        ])
 
         let label = NSTextField(labelWithString: title)
-        label.font = NSFont.boldSystemFont(ofSize: 13)
+        label.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
         label.textColor = .labelColor
 
-        stack.addArrangedSubview(imageView)
+        stack.addArrangedSubview(iconContainer)
         stack.addArrangedSubview(label)
 
-        let separator = NSBox()
-        separator.boxType = .separator
-        separator.translatesAutoresizingMaskIntoConstraints = false
-
-        let container = NSStackView()
-        container.orientation = .vertical
-        container.alignment = .leading
-        container.spacing = 10
-        container.addArrangedSubview(stack)
-        container.addArrangedSubview(separator)
-
-        separator.widthAnchor.constraint(equalTo: container.widthAnchor).isActive = true
-
-        return container
+        return stack
     }
 
     private func createLabeledRow(label: String, field: NSTextField, placeholder: String) -> NSStackView {
@@ -237,7 +398,13 @@ final class SettingsWindowController: NSWindowController {
         return stack
     }
 
-    private func createButtonFieldRow(field: NSTextField, button: NSButton, placeholder: String) -> NSStackView {
+    private func createPopupFieldRow(
+        field: NSTextField,
+        popup: NSPopUpButton,
+        placeholder: String,
+        searchField: NSSearchField,
+        menuTitle: String
+    ) -> NSStackView {
         let stack = NSStackView()
         stack.orientation = .horizontal
         stack.alignment = .centerY
@@ -247,31 +414,34 @@ final class SettingsWindowController: NSWindowController {
         field.controlSize = .regular
         field.bezelStyle = .roundedBezel
 
-        configurePickButton(button)
+        configureAppPopup(popup, searchField: searchField, menuTitle: menuTitle)
 
         stack.addArrangedSubview(field)
-        stack.addArrangedSubview(button)
+        stack.addArrangedSubview(popup)
 
         field.translatesAutoresizingMaskIntoConstraints = false
-        button.translatesAutoresizingMaskIntoConstraints = false
+        popup.translatesAutoresizingMaskIntoConstraints = false
 
         return stack
     }
 
-    private func configurePickButton(_ button: NSButton) {
-        button.title = "Choose..."
-        button.bezelStyle = .rounded
-        button.controlSize = .small
+    private func configureAppPopup(_ popup: NSPopUpButton, searchField: NSSearchField, menuTitle: String) {
+        popup.pullsDown = false
+        popup.controlSize = .regular
+        popup.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        popup.menu = NSMenu(title: menuTitle)
+        popup.menu?.delegate = self
+        configureMenuSearchField(searchField)
+        populateInstalledApps(into: popup, filter: searchField.stringValue)
+    }
 
-        if let image = NSImage(systemSymbolName: "plus.app", accessibilityDescription: "Choose App") {
-            image.isTemplate = true
-            image.size = NSSize(width: 14, height: 14)
-            button.image = image
-            button.imagePosition = .imageLeading
-        }
-
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.widthAnchor.constraint(equalToConstant: 110).isActive = true
+    private func configureMenuSearchField(_ field: NSSearchField) {
+        field.placeholderString = "Filter apps"
+        field.controlSize = .small
+        field.sendsSearchStringImmediately = true
+        field.target = self
+        field.action = #selector(handleMenuSearchChanged(_:))
+        field.frame = NSRect(x: 0, y: 0, width: 240, height: 22)
     }
 
     private func createInfoLabel(text: String) -> NSTextField {
@@ -319,6 +489,8 @@ final class SettingsWindowController: NSWindowController {
         autoStartAppsField.stringValue = settings.autoStartBundleIds.joined(separator: ", ")
         fullscreenRuleCheckbox.state = settings.fullscreenNonWork ? .on : .off
         whitelistField.stringValue = settings.whitelistBundleIds.joined(separator: ", ")
+        populateInstalledApps(into: autoStartAppPopup, filter: autoStartSearchField.stringValue)
+        populateInstalledApps(into: whitelistAppPopup, filter: whitelistSearchField.stringValue)
     }
 
     @objc private func handleSave() {
@@ -329,60 +501,193 @@ final class SettingsWindowController: NSWindowController {
         settings.autoStart = autoStartCheckbox.state == .on
         settings.fullscreenNonWork = fullscreenRuleCheckbox.state == .on
 
-        let autoStartRaw = autoStartAppsField.stringValue
-        let autoStartParts = autoStartRaw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        settings.autoStartBundleIds = autoStartParts.filter { !$0.isEmpty }
-
-        let raw = whitelistField.stringValue
-        let parts = raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        settings.whitelistBundleIds = parts.filter { !$0.isEmpty }
+        settings.autoStartBundleIds = bundleIds(from: autoStartAppsField)
+        settings.whitelistBundleIds = bundleIds(from: whitelistField)
 
         onSave()
         window?.close()
     }
 
-    @objc private func handlePickAutoStartApp() {
-        pickBundleId(into: autoStartAppsField)
-    }
-
-    @objc private func handlePickWhitelistApp() {
-        pickBundleId(into: whitelistField)
-    }
-
-    private func pickBundleId(into field: NSTextField) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.allowedFileTypes = ["app"]
-        panel.title = "Choose an app"
-        panel.begin { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
-            guard let bundle = Bundle(url: url), let bundleId = bundle.bundleIdentifier else {
-                self?.showAlert(title: "Bundle ID Not Found", message: "The selected app does not have a bundle identifier.")
-                return
-            }
-            self?.appendBundleId(bundleId, to: field)
+    @objc private func handleMenuSearchChanged(_ sender: NSSearchField) {
+        if sender === autoStartSearchField {
+            populateInstalledApps(into: autoStartAppPopup, filter: autoStartSearchField.stringValue)
+            window?.makeFirstResponder(autoStartSearchField)
+        } else if sender === whitelistSearchField {
+            populateInstalledApps(into: whitelistAppPopup, filter: whitelistSearchField.stringValue)
+            window?.makeFirstResponder(whitelistSearchField)
         }
     }
 
-    private func appendBundleId(_ bundleId: String, to field: NSTextField) {
-        let existing = field.stringValue
+    @objc private func handlePopupMenuItem(_ sender: NSMenuItem) {
+        let tag = sender.tag
+        if tag == -1 || tag == 0 { return }
+
+        let isAutoStart = (tag >= 1000 && tag < 2000)
+        let isWhitelist = (tag >= 2000 && tag < 3000)
+        
+        guard isAutoStart || isWhitelist else { return }
+        
+        let popup = isAutoStart ? autoStartAppPopup : whitelistAppPopup
+        let field = isAutoStart ? autoStartAppsField : whitelistField
+        let filter = isAutoStart ? autoStartSearchField.stringValue : whitelistSearchField.stringValue
+        
+        let actionType = tag % 1000
+        
+        switch actionType {
+        case 1:
+            refreshInstalledApps()
+            populateInstalledApps(into: popup, filter: filter)
+            selectPlaceholder(in: popup)
+        case 2:
+            if let bundleId = sender.representedObject as? String {
+                toggleBundleId(bundleId, in: field)
+            }
+            populateInstalledApps(into: popup, filter: filter)
+            selectPlaceholder(in: popup)
+        default:
+            selectPlaceholder(in: popup)
+        }
+    }
+
+    private func populateInstalledApps(into popup: NSPopUpButton, filter: String) {
+        popup.removeAllItems()
+        if popup.menu == nil {
+            popup.menu = NSMenu()
+        }
+        
+        let isAutoStart = (popup === autoStartAppPopup)
+        let baseTag = isAutoStart ? 1000 : 2000
+        
+        let selectedIds = Set(bundleIds(from: field(for: popup)))
+        let searchField = searchField(for: popup)
+        let searchItem = NSMenuItem()
+        searchItem.view = searchField
+        searchItem.tag = -1
+        popup.menu?.addItem(searchItem)
+        popup.menu?.addItem(.separator())
+
+        let placeholder = NSMenuItem(title: "Select installed app...", action: nil, keyEquivalent: "")
+        placeholder.tag = 0
+        popup.menu?.addItem(placeholder)
+
+        let normalized = filter.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        for app in installedApps() {
+            if !normalized.isEmpty {
+                let haystack = "\(app.name) \(app.bundleId)".lowercased()
+                if !haystack.contains(normalized) {
+                    continue
+                }
+            }
+            let item = NSMenuItem(title: "\(app.name) (\(app.bundleId))", action: nil, keyEquivalent: "")
+            if let icon = app.icon {
+                item.image = icon
+            }
+            item.representedObject = app.bundleId
+            item.tag = baseTag + 2
+            item.state = selectedIds.contains(app.bundleId) ? .on : .off
+            item.target = self
+            item.action = #selector(handlePopupMenuItem(_:))
+            popup.menu?.addItem(item)
+        }
+
+        let refresh = NSMenuItem(title: "Refresh list", action: nil, keyEquivalent: "")
+        refresh.tag = baseTag + 1
+        refresh.target = self
+        refresh.action = #selector(handlePopupMenuItem(_:))
+        popup.menu?.addItem(refresh)
+        selectPlaceholder(in: popup)
+    }
+
+    private func field(for popup: NSPopUpButton) -> NSTextField {
+        if popup === autoStartAppPopup {
+            return autoStartAppsField
+        }
+        return whitelistField
+    }
+
+    private func searchField(for popup: NSPopUpButton) -> NSSearchField {
+        if popup === autoStartAppPopup {
+            return autoStartSearchField
+        }
+        return whitelistSearchField
+    }
+
+    private func bundleIds(from field: NSTextField) -> [String] {
+        field.stringValue
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        if existing.contains(bundleId) {
-            return
-        }
-        let updated = existing + [bundleId]
-        field.stringValue = updated.joined(separator: ", ")
     }
 
-    private func showAlert(title: String, message: String) {
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = title
-        alert.informativeText = message
-        alert.runModal()
+    private func toggleBundleId(_ bundleId: String, in field: NSTextField) {
+        var existing = bundleIds(from: field)
+        if let index = existing.firstIndex(of: bundleId) {
+            existing.remove(at: index)
+        } else {
+            existing.append(bundleId)
+        }
+        field.stringValue = existing.joined(separator: ", ")
+    }
+
+    private func selectPlaceholder(in popup: NSPopUpButton) {
+        if let placeholder = popup.menu?.item(withTag: 0) {
+            popup.select(placeholder)
+        }
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        if menu === autoStartAppPopup.menu {
+            window?.makeFirstResponder(autoStartSearchField)
+        } else if menu === whitelistAppPopup.menu {
+            window?.makeFirstResponder(whitelistSearchField)
+        }
+    }
+
+    private func installedApps() -> [AppInfo] {
+        if installedAppsCache.isEmpty {
+            installedAppsCache = loadInstalledApps()
+        }
+        return installedAppsCache
+    }
+
+    private func refreshInstalledApps() {
+        installedAppsCache = loadInstalledApps()
+    }
+
+    private func loadInstalledApps() -> [AppInfo] {
+        var results: [AppInfo] = []
+        var seen = Set<String>()
+        let fileManager = FileManager.default
+        let searchUrls = [
+            URL(fileURLWithPath: "/Applications"),
+            URL(fileURLWithPath: "/Applications/Utilities"),
+            URL(fileURLWithPath: "/System/Applications"),
+            URL(fileURLWithPath: "/System/Applications/Utilities"),
+            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
+        ]
+
+        for base in searchUrls where fileManager.fileExists(atPath: base.path) {
+            guard let enumerator = fileManager.enumerator(
+                at: base,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            ) else { continue }
+            for case let url as URL in enumerator {
+                guard url.pathExtension == "app" else { continue }
+                guard let bundle = Bundle(url: url), let bundleId = bundle.bundleIdentifier else { continue }
+                if !seen.insert(bundleId).inserted {
+                    continue
+                }
+                let name =
+                    (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+                    ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
+                    ?? url.deletingPathExtension().lastPathComponent
+                let icon = NSWorkspace.shared.icon(forFile: url.path)
+                icon.size = NSSize(width: 16, height: 16)
+                results.append(AppInfo(name: name, bundleId: bundleId, icon: icon))
+            }
+        }
+
+        return results.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 }

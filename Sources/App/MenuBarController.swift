@@ -1,6 +1,14 @@
 import AppKit
+import QuartzCore
 
 final class MenuBarController {
+    enum TimerMode {
+        case idle
+        case work
+        case rest
+        case paused
+    }
+
     var onToggle: (() -> Void)?
     var onReset: (() -> Void)?
     var onOpenStats: (() -> Void)?
@@ -10,6 +18,10 @@ final class MenuBarController {
     private let statusItem: NSStatusItem
     private let menu: NSMenu
     private let statusTitleItem = NSMenuItem(title: "Idle", action: nil, keyEquivalent: "")
+    private var currentMode: TimerMode = .idle
+    private var totalDuration: Int = 25 * 60
+    private var progressLayer: CAShapeLayer?
+    private var backgroundLayer: CAShapeLayer?
 
     init(
         onToggle: (() -> Void)? = nil,
@@ -27,21 +39,34 @@ final class MenuBarController {
         self.menu = NSMenu()
         buildMenu()
         configureStatusItem()
+        setupProgressRing()
     }
 
-    func setRemaining(seconds: Int, label: String = "Remaining") {
+    func setTotalDuration(seconds: Int) {
+        totalDuration = max(1, seconds)
+    }
+
+    func setRemaining(seconds: Int, label: String = "Remaining", isBreak: Bool = false) {
         let minutes = seconds / 60
         let secs = seconds % 60
         let text = String(format: "%02d:%02d", minutes, secs)
         statusItem.button?.title = text
         statusTitleItem.title = "\(label): \(text)"
+        currentMode = isBreak ? .rest : .work
         updateStatusIcon(isRunning: true)
+        updateProgressRing(remaining: seconds)
     }
 
     func setStatus(text: String) {
         statusItem.button?.title = ""
         statusTitleItem.title = text
+        if text == "Paused" {
+            currentMode = .paused
+        } else {
+            currentMode = .idle
+        }
         updateStatusIcon(isRunning: false)
+        updateProgressRing(remaining: 0)
     }
 
     private func configureStatusItem() {
@@ -52,16 +77,98 @@ final class MenuBarController {
 
     private func updateStatusIcon(isRunning: Bool) {
         guard let button = statusItem.button else { return }
-        let symbolName = isRunning ? "timer.circle.fill" : "timer.circle"
+        let symbolName: String
+        let tintColor: NSColor
+
+        switch currentMode {
+        case .work:
+            symbolName = "timer.circle.fill"
+            tintColor = NSColor.systemGreen
+        case .rest:
+            symbolName = "cup.and.saucer.fill"
+            tintColor = NSColor.systemBlue
+        case .paused:
+            symbolName = "pause.circle.fill"
+            tintColor = NSColor.systemOrange
+        case .idle:
+            symbolName = "timer.circle"
+            tintColor = NSColor.secondaryLabelColor
+        }
+
         if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Pomodoro") {
-            image.isTemplate = true
-            if isRunning {
-                button.contentTintColor = NSColor.controlAccentColor
-            } else {
-                button.contentTintColor = nil
-            }
+            image.isTemplate = false
+            button.contentTintColor = tintColor
             button.image = image
         }
+    }
+
+    private func setupProgressRing() {
+        guard let button = statusItem.button else { return }
+        button.wantsLayer = true
+
+        let size: CGFloat = 18
+        let lineWidth: CGFloat = 2.5
+        let center = CGPoint(x: size / 2, y: size / 2)
+        let radius = (size - lineWidth) / 2
+
+        let circlePath = CGPath(
+            ellipseIn: CGRect(x: lineWidth / 2, y: lineWidth / 2, width: size - lineWidth, height: size - lineWidth),
+            transform: nil
+        )
+
+        let bgLayer = CAShapeLayer()
+        bgLayer.path = circlePath
+        bgLayer.fillColor = nil
+        bgLayer.strokeColor = NSColor.tertiaryLabelColor.cgColor
+        bgLayer.lineWidth = lineWidth
+        bgLayer.frame = CGRect(x: 0, y: 0, width: size, height: size)
+        bgLayer.isHidden = true
+        backgroundLayer = bgLayer
+
+        let progressPath = CGMutablePath()
+        progressPath.addArc(center: center, radius: radius, startAngle: .pi / 2, endAngle: -.pi * 1.5, clockwise: true)
+
+        let progLayer = CAShapeLayer()
+        progLayer.path = progressPath
+        progLayer.fillColor = nil
+        progLayer.strokeColor = NSColor.systemGreen.cgColor
+        progLayer.lineWidth = lineWidth
+        progLayer.lineCap = .round
+        progLayer.strokeEnd = 0
+        progLayer.frame = CGRect(x: 0, y: 0, width: size, height: size)
+        progLayer.isHidden = true
+        progressLayer = progLayer
+    }
+
+    private func updateProgressRing(remaining: Int) {
+        let progress: CGFloat
+        if remaining > 0 && totalDuration > 0 {
+            progress = CGFloat(remaining) / CGFloat(totalDuration)
+            progressLayer?.isHidden = false
+            backgroundLayer?.isHidden = false
+        } else {
+            progress = 0
+            progressLayer?.isHidden = true
+            backgroundLayer?.isHidden = true
+        }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        progressLayer?.strokeEnd = progress
+
+        let color: NSColor
+        switch currentMode {
+        case .work:
+            color = .systemGreen
+        case .rest:
+            color = .systemBlue
+        case .paused:
+            color = .systemOrange
+        case .idle:
+            color = .secondaryLabelColor
+        }
+        progressLayer?.strokeColor = color.cgColor
+        CATransaction.commit()
     }
 
     private func buildMenu() {

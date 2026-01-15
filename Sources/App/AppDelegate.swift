@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func wireTimerCallbacks() {
         workTimer.onTick = { [weak self] remaining in
             guard let self else { return }
-            self.menuBar.setRemaining(seconds: remaining)
+            self.menuBar.setRemaining(seconds: remaining, isBreak: false)
         }
 
         workTimer.onComplete = { [weak self] in
@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         breakTimer.onTick = { [weak self] remaining in
             guard let self else { return }
-            self.menuBar.setRemaining(seconds: remaining, label: "Break")
+            self.menuBar.setRemaining(seconds: remaining, label: "Break", isBreak: true)
         }
 
         breakTimer.onComplete = { [weak self] in
@@ -89,6 +89,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func configureNotifications() {
+        // UNUserNotificationCenter requires a valid app bundle
+        guard Bundle.main.bundleIdentifier != nil else {
+            print("[DEBUG] Skipping notifications - not running as app bundle")
+            return
+        }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -105,13 +110,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func pollFocusState() {
-        guard settings.autoStart else { return }
-        guard detector.isAccessibilityTrusted else { return }
-        guard let snapshot = detector.snapshot() else { return }
+        guard settings.autoStart else {
+            print("[DEBUG] autoStart is disabled")
+            return
+        }
+        guard detector.isAccessibilityTrusted else {
+            print("[DEBUG] Accessibility not trusted")
+            return
+        }
+        guard let snapshot = detector.snapshot() else {
+            print("[DEBUG] Could not get snapshot")
+            return
+        }
 
         cache.append(snapshot: snapshot)
 
         let isWork = ruleEngine.isWork(snapshot: snapshot)
+        print("[DEBUG] App: \(snapshot.bundleId), isWork: \(isWork), allowlist: \(settings.autoStartBundleIds)")
         if isWork {
             if !workTimer.isRunning && !breakTimer.isRunning {
                 startTimer()
@@ -184,7 +199,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func updateStatusTextForCurrentState() {
         switch state {
         case .running:
-            menuBar.setRemaining(seconds: workTimer.remainingSeconds)
+            menuBar.setTotalDuration(seconds: settings.workMinutes * 60)
+            menuBar.setRemaining(seconds: workTimer.remainingSeconds, isBreak: false)
         case .paused:
             menuBar.setStatus(text: "Paused")
         case .completed:
@@ -192,11 +208,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         case .idle:
             menuBar.setStatus(text: "Idle")
         case .resting:
-            menuBar.setRemaining(seconds: breakTimer.remainingSeconds, label: "Break")
+            menuBar.setTotalDuration(seconds: settings.breakMinutes * 60)
+            menuBar.setRemaining(seconds: breakTimer.remainingSeconds, label: "Break", isBreak: true)
         }
     }
 
     private func sendCompletionNotification() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
         content.title = "Pomodoro Complete"
         content.body = "Time for a break."
@@ -209,6 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func sendBreakStartedNotification() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
         content.title = "Break Started"
         content.body = "Relax for a bit."
@@ -221,6 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func sendBreakEndedNotification() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
         content.title = "Break Over"
         content.body = "Ready to start the next session."
@@ -233,6 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func sendWorkStartedNotification() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
         content.title = "Pomodoro Started"
         content.body = "Focus time begins."
@@ -254,7 +275,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func openSettings() {
         if settingsWindow == nil {
-            settingsWindow = SettingsWindowController(settings: settings) { [weak self] in
+            settingsWindow = SettingsWindowController(settings: settings, statsStore: statsStore) { [weak self] in
                 self?.applySettings()
             }
         }
