@@ -123,10 +123,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
 
+        // Ignore self - don't pause when user clicks our menu bar
+        if snapshot.bundleId == "com.pomodoroauto.app" {
+            return
+        }
+
         cache.append(snapshot: snapshot)
 
-        let isWork = ruleEngine.isWork(snapshot: snapshot)
-        print("[DEBUG] App: \(snapshot.bundleId), isWork: \(isWork), allowlist: \(settings.autoStartBundleIds)")
+        let runningBundleIds = detector.runningBundleIds()
+        let allowlist = Set(settings.autoStartBundleIds)
+        let runningAllowlistApps = allowlist.intersection(runningBundleIds)
+        let isWork = !runningAllowlistApps.isEmpty
+        
+        print("[DEBUG] App: \(snapshot.bundleId), isWork: \(isWork), running allowlist apps: \(runningAllowlistApps)")
         if isWork {
             if !workTimer.isRunning && !breakTimer.isRunning {
                 startTimer()

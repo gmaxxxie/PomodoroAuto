@@ -25,6 +25,10 @@ final class FocusStateDetector {
         return FocusSnapshot(appName: appName, bundleId: bundleId, isFullscreen: isFullscreen, timestamp: Date())
     }
 
+    func runningBundleIds() -> Set<String> {
+        Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier })
+    }
+
     private func focusedWindowIsFullscreen() -> Bool {
         let systemWide = AXUIElementCreateSystemWide()
         var focusedWindow: AnyObject?
