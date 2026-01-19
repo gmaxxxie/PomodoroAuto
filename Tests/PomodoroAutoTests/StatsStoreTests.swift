@@ -49,4 +49,50 @@ final class StatsStoreTests: XCTestCase {
         XCTAssertEqual(stats.workSeconds, 100)
         XCTAssertEqual(stats.pomodoroCount, 1)
     }
+
+    func testAllStatsReturnsAllDays() {
+        store.addWorkSeconds(100)
+        store.incrementPomodoro()
+
+        let all = store.allStats()
+        XCTAssertEqual(all.count, 1)
+        let todayStats = all.values.first
+        XCTAssertEqual(todayStats?.workSeconds, 100)
+        XCTAssertEqual(todayStats?.pomodoroCount, 1)
+    }
+
+    func testTotalStatsAggregatesCorrectly() {
+        store.addWorkSeconds(100)
+        store.incrementPomodoro()
+        store.addWorkSeconds(50)
+        store.incrementPomodoro()
+
+        let total = store.totalStats()
+        XCTAssertEqual(total.workSeconds, 150)
+        XCTAssertEqual(total.pomodoroCount, 2)
+    }
+
+    func testTotalStatsEmptyReturnsZero() {
+        let total = store.totalStats()
+        XCTAssertEqual(total.workSeconds, 0)
+        XCTAssertEqual(total.pomodoroCount, 0)
+    }
+
+    func testAverageStatsCalculatesCorrectly() {
+        store.addWorkSeconds(100)
+        store.incrementPomodoro()
+        store.incrementPomodoro()
+
+        let avg = store.averageStats()
+        XCTAssertEqual(avg.dayCount, 1)
+        XCTAssertEqual(avg.avgWorkSeconds, 100.0, accuracy: 0.01)
+        XCTAssertEqual(avg.avgPomodoroCount, 2.0, accuracy: 0.01)
+    }
+
+    func testAverageStatsEmptyReturnsZero() {
+        let avg = store.averageStats()
+        XCTAssertEqual(avg.dayCount, 0)
+        XCTAssertEqual(avg.avgWorkSeconds, 0.0)
+        XCTAssertEqual(avg.avgPomodoroCount, 0.0)
+    }
 }

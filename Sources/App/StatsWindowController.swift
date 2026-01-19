@@ -9,10 +9,16 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
     private var motivationLabel: NSTextField?
     private let dailyGoalPomodoros = 8
 
+    private var totalPomodoroLabel: NSTextField?
+    private var totalWorkTimeLabel: NSTextField?
+    private var avgPomodoroLabel: NSTextField?
+    private var avgWorkTimeLabel: NSTextField?
+    private var dayCountLabel: NSTextField?
+
     init(statsStore: StatsStore) {
         self.statsStore = statsStore
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 380),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 560),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -49,6 +55,15 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         let progress = min(1.0, CGFloat(stats.pomodoroCount) / CGFloat(dailyGoalPomodoros))
         updateProgressRing(progress: progress)
         updateMotivation(pomodoroCount: stats.pomodoroCount)
+
+        let total = statsStore.totalStats()
+        totalPomodoroLabel?.stringValue = "\(total.pomodoroCount)"
+        totalWorkTimeLabel?.stringValue = formatDuration(total.workSeconds)
+
+        let avg = statsStore.averageStats()
+        avgPomodoroLabel?.stringValue = String(format: "%.1f", avg.avgPomodoroCount)
+        avgWorkTimeLabel?.stringValue = formatDuration(Int(avg.avgWorkSeconds))
+        dayCountLabel?.stringValue = "\(avg.dayCount)"
     }
 
     private func buildContent() {
@@ -73,6 +88,9 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
 
         let statsCard = createStatsCard()
         mainStack.addArrangedSubview(statsCard)
+
+        let allTimeCard = createAllTimeCard()
+        mainStack.addArrangedSubview(allTimeCard)
 
         let motivation = NSTextField(labelWithString: "Keep going!")
         motivation.font = NSFont.systemFont(ofSize: 13, weight: .medium)
@@ -283,5 +301,144 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
             return String(format: "%d:%02d:%02d", hours, minutes, secs)
         }
         return String(format: "%02d:%02d", minutes, secs)
+    }
+
+    private func createAllTimeCard() -> NSView {
+        let card = NSVisualEffectView()
+        card.material = .popover
+        card.state = .active
+        card.wantsLayer = true
+        card.layer?.cornerRadius = 14
+        card.translatesAutoresizingMaskIntoConstraints = false
+
+        let outerStack = NSStackView()
+        outerStack.orientation = .vertical
+        outerStack.alignment = .leading
+        outerStack.spacing = 12
+        outerStack.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(outerStack)
+
+        let titleLabel = NSTextField(labelWithString: "All Time")
+        titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        titleLabel.textColor = .labelColor
+        outerStack.addArrangedSubview(titleLabel)
+
+        let gridStack = NSStackView()
+        gridStack.orientation = .vertical
+        gridStack.alignment = .leading
+        gridStack.spacing = 8
+
+        let totalPomodoroRow = createStatRow(
+            symbolName: "checkmark.circle.fill",
+            color: .systemGreen,
+            label: "Total Pomodoros",
+            value: "0"
+        )
+        totalPomodoroLabel = totalPomodoroRow.valueLabel
+        gridStack.addArrangedSubview(totalPomodoroRow.view)
+
+        let totalWorkRow = createStatRow(
+            symbolName: "clock.fill",
+            color: .systemBlue,
+            label: "Total Work Time",
+            value: "--:--"
+        )
+        totalWorkTimeLabel = totalWorkRow.valueLabel
+        gridStack.addArrangedSubview(totalWorkRow.view)
+
+        let avgPomodoroRow = createStatRow(
+            symbolName: "chart.bar.fill",
+            color: .systemOrange,
+            label: "Avg Pomodoros/Day",
+            value: "0.0"
+        )
+        avgPomodoroLabel = avgPomodoroRow.valueLabel
+        gridStack.addArrangedSubview(avgPomodoroRow.view)
+
+        let avgWorkRow = createStatRow(
+            symbolName: "hourglass",
+            color: .systemPurple,
+            label: "Avg Work Time/Day",
+            value: "--:--"
+        )
+        avgWorkTimeLabel = avgWorkRow.valueLabel
+        gridStack.addArrangedSubview(avgWorkRow.view)
+
+        let dayCountRow = createStatRow(
+            symbolName: "calendar",
+            color: .systemTeal,
+            label: "Days Tracked",
+            value: "0"
+        )
+        dayCountLabel = dayCountRow.valueLabel
+        gridStack.addArrangedSubview(dayCountRow.view)
+
+        outerStack.addArrangedSubview(gridStack)
+
+        NSLayoutConstraint.activate([
+            outerStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            outerStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            outerStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+            outerStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14),
+            card.widthAnchor.constraint(greaterThanOrEqualToConstant: 220)
+        ])
+
+        return card
+    }
+
+    private func createStatRow(
+        symbolName: String,
+        color: NSColor,
+        label: String,
+        value: String
+    ) -> (view: NSView, valueLabel: NSTextField) {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 10
+
+        let iconContainer = NSView()
+        iconContainer.wantsLayer = true
+        iconContainer.layer?.backgroundColor = color.withAlphaComponent(0.15).cgColor
+        iconContainer.layer?.cornerRadius = 6
+        iconContainer.translatesAutoresizingMaskIntoConstraints = false
+
+        let imageView = NSImageView()
+        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
+            image.isTemplate = true
+            imageView.image = image
+            imageView.contentTintColor = color
+        }
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        iconContainer.addSubview(imageView)
+
+        NSLayoutConstraint.activate([
+            iconContainer.widthAnchor.constraint(equalToConstant: 24),
+            iconContainer.heightAnchor.constraint(equalToConstant: 24),
+            imageView.centerXAnchor.constraint(equalTo: iconContainer.centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: iconContainer.centerYAnchor),
+            imageView.widthAnchor.constraint(equalToConstant: 12),
+            imageView.heightAnchor.constraint(equalToConstant: 12)
+        ])
+
+        row.addArrangedSubview(iconContainer)
+
+        let labelField = NSTextField(labelWithString: label)
+        labelField.font = NSFont.systemFont(ofSize: 12)
+        labelField.textColor = .secondaryLabelColor
+        row.addArrangedSubview(labelField)
+
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        row.addArrangedSubview(spacer)
+
+        let valueField = NSTextField(labelWithString: value)
+        valueField.font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+        valueField.textColor = .labelColor
+        valueField.alignment = .right
+        row.addArrangedSubview(valueField)
+
+        return (row, valueField)
     }
 }

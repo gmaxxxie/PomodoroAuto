@@ -70,4 +70,38 @@ final class StatsStore {
     func clearAll() {
         defaults.removeObject(forKey: key)
     }
+
+    func allStats() -> [String: DayStats] {
+        return loadAll()
+    }
+
+    func totalStats() -> DayStats {
+        let all = loadAll()
+        var totalWorkSeconds = 0
+        var totalPomodoroCount = 0
+        for (_, stats) in all {
+            totalWorkSeconds += stats.workSeconds
+            totalPomodoroCount += stats.pomodoroCount
+        }
+        return DayStats(workSeconds: totalWorkSeconds, pomodoroCount: totalPomodoroCount)
+    }
+
+    func averageStats() -> (avgWorkSeconds: Double, avgPomodoroCount: Double, dayCount: Int) {
+        let all = loadAll()
+        let count = all.count
+        guard count > 0 else {
+            return (0, 0, 0)
+        }
+        var totalWorkSeconds = 0
+        var totalPomodoroCount = 0
+        for (_, stats) in all {
+            totalWorkSeconds += stats.workSeconds
+            totalPomodoroCount += stats.pomodoroCount
+        }
+        return (
+            avgWorkSeconds: Double(totalWorkSeconds) / Double(count),
+            avgPomodoroCount: Double(totalPomodoroCount) / Double(count),
+            dayCount: count
+        )
+    }
 }

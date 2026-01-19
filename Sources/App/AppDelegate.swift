@@ -19,19 +19,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let cache = StateCache(maxCount: 1000)
     private let workTimer: PomodoroTimer
     private let breakTimer: PomodoroTimer
-    private let menuBar = MenuBarController()
-    private var settingsWindow: SettingsWindowController?
-    private var statsWindow: StatsWindowController?
-    private var focusTimer: DispatchSourceTimer?
-    private var activeSessionStart: Date?
-    private var accumulatedWorkSeconds = 0
-    private var state: SessionState = .idle
+    private let menuBar: MenuBarController
 
     override init() {
         self.ruleEngine = RuleEngine(config: settings.ruleConfig)
         self.workTimer = PomodoroTimer(durationSeconds: settings.workMinutes * 60)
         self.breakTimer = PomodoroTimer(durationSeconds: settings.breakMinutes * 60)
+        self.menuBar = MenuBarController()
         super.init()
+        menuBar.statsProvider = { [weak self] in
+            guard let self else { return MenuBarController.TodayStats(pomodoroCount: 0, workSeconds: 0) }
+            let stats = self.statsStore.statsForToday()
+            return MenuBarController.TodayStats(pomodoroCount: stats.pomodoroCount, workSeconds: stats.workSeconds)
+        }
         wireTimerCallbacks()
         wireMenuCallbacks()
     }

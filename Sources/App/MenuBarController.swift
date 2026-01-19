@@ -1,7 +1,7 @@
 import AppKit
 import QuartzCore
 
-final class MenuBarController {
+final class MenuBarController: NSObject, NSMenuDelegate {
     enum TimerMode {
         case idle
         case work
@@ -9,15 +9,23 @@ final class MenuBarController {
         case paused
     }
 
+    struct TodayStats {
+        var pomodoroCount: Int
+        var workSeconds: Int
+    }
+
     var onToggle: (() -> Void)?
     var onReset: (() -> Void)?
     var onOpenStats: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onQuit: (() -> Void)?
+    var statsProvider: (() -> TodayStats)?
 
     private let statusItem: NSStatusItem
     private let menu: NSMenu
     private let statusTitleItem = NSMenuItem(title: "Idle", action: nil, keyEquivalent: "")
+    private let pomodoroStatsItem = NSMenuItem(title: "🍅 0 pomodoros", action: nil, keyEquivalent: "")
+    private let workTimeStatsItem = NSMenuItem(title: "⏱ 00:00", action: nil, keyEquivalent: "")
     private var currentMode: TimerMode = .idle
     private var totalDuration: Int = 25 * 60
     private var progressLayer: CAShapeLayer?
@@ -28,18 +36,44 @@ final class MenuBarController {
         onReset: (() -> Void)? = nil,
         onOpenStats: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
-        onQuit: (() -> Void)? = nil
+        onQuit: (() -> Void)? = nil,
+        statsProvider: (() -> TodayStats)? = nil
     ) {
         self.onToggle = onToggle
         self.onReset = onReset
         self.onOpenStats = onOpenStats
         self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
+        self.statsProvider = statsProvider
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.menu = NSMenu()
+        super.init()
         buildMenu()
         configureStatusItem()
         setupProgressRing()
+        menu.delegate = self
+    }
+
+    // MARK: - NSMenuDelegate
+
+    func menuWillOpen(_ menu: NSMenu) {
+        refreshStats()
+    }
+
+    func refreshStats() {
+        guard let stats = statsProvider?() else { return }
+        pomodoroStatsItem.title = "  \(stats.pomodoroCount) pomodoro\(stats.pomodoroCount == 1 ? "" : "s")"
+        workTimeStatsItem.title = "  \(formatDuration(stats.workSeconds))"
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let clamped = max(0, seconds)
+        let hours = clamped / 3600
+        let minutes = (clamped % 3600) / 60
+        if hours > 0 {
+            return String(format: "%dh %02dm", hours, minutes)
+        }
+        return String(format: "%dm", minutes)
     }
 
     func setTotalDuration(seconds: Int) {
@@ -173,6 +207,20 @@ final class MenuBarController {
 
     private func buildMenu() {
         menu.addItem(statusTitleItem)
+        menu.addItem(.separator())
+
+        let pomodoroIcon = NSImage(systemSymbolName: "target", accessibilityDescription: "Pomodoros")
+        pomodoroIcon?.isTemplate = true
+        pomodoroStatsItem.image = pomodoroIcon
+        pomodoroStatsItem.isEnabled = false
+        menu.addItem(pomodoroStatsItem)
+
+        let clockIcon = NSImage(systemSymbolName: "clock.fill", accessibilityDescription: "Work time")
+        clockIcon?.isTemplate = true
+        workTimeStatsItem.image = clockIcon
+        workTimeStatsItem.isEnabled = false
+        menu.addItem(workTimeStatsItem)
+
         menu.addItem(.separator())
 
         let toggleItem = createMenuItem(

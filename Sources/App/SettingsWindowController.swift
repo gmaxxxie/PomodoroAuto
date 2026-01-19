@@ -17,6 +17,9 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
     private let whitelistSearchField = NSSearchField()
     private var installedAppsCache: [AppInfo] = []
 
+    private let autoStartChipsContainer = NSStackView()
+    private let whitelistChipsContainer = NSStackView()
+
     private struct AppInfo {
         let name: String
         let bundleId: String
@@ -28,7 +31,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         self.statsStore = statsStore
         self.onSave = onSave
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 680, height: 600),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -181,6 +184,9 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         )
         section.addArrangedSubview(appsRow)
 
+        configureChipsContainer(autoStartChipsContainer)
+        section.addArrangedSubview(autoStartChipsContainer)
+
         return section
     }
 
@@ -208,6 +214,9 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
             menuTitle: "whitelistApps"
         )
         section.addArrangedSubview(whitelistRow)
+
+        configureChipsContainer(whitelistChipsContainer)
+        section.addArrangedSubview(whitelistChipsContainer)
 
         let note = createNoteLabel(text: "Note: Safari fullscreen is always treated as non-work.")
         section.addArrangedSubview(note)
@@ -459,6 +468,157 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         return label
     }
 
+    private func configureChipsContainer(_ container: NSStackView) {
+        container.orientation = .vertical
+        container.alignment = .leading
+        container.spacing = 6
+        container.translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    private func updateChips(for container: NSStackView, bundleIds: [String]) {
+        container.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+        if bundleIds.isEmpty { return }
+
+        let flowContainer = NSView()
+        flowContainer.translatesAutoresizingMaskIntoConstraints = false
+
+        var chips: [NSView] = []
+        let appCache = Dictionary(uniqueKeysWithValues: installedApps().map { ($0.bundleId, $0) })
+
+        for bundleId in bundleIds {
+            let chip = createChip(
+                bundleId: bundleId,
+                appInfo: appCache[bundleId],
+                container: container
+            )
+            chips.append(chip)
+            flowContainer.addSubview(chip)
+        }
+
+        container.addArrangedSubview(flowContainer)
+
+        flowContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 500).isActive = true
+
+        layoutChipsInFlow(chips, container: flowContainer)
+    }
+
+    private func layoutChipsInFlow(_ chips: [NSView], container: NSView) {
+        guard !chips.isEmpty else { return }
+
+        let maxWidth: CGFloat = 500
+        let horizontalSpacing: CGFloat = 6
+        let verticalSpacing: CGFloat = 6
+
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+
+        for chip in chips {
+            chip.layoutSubtreeIfNeeded()
+            let chipWidth = chip.fittingSize.width
+            let chipHeight = chip.fittingSize.height
+
+            if x + chipWidth > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + verticalSpacing
+                rowHeight = 0
+            }
+
+            chip.frame = NSRect(x: x, y: y, width: chipWidth, height: chipHeight)
+            x += chipWidth + horizontalSpacing
+            rowHeight = max(rowHeight, chipHeight)
+        }
+
+        let totalHeight = y + rowHeight
+        container.heightAnchor.constraint(equalToConstant: max(totalHeight, 24)).isActive = true
+    }
+
+    private func createChip(bundleId: String, appInfo: AppInfo?, container: NSStackView) -> NSView {
+        let chip = NSView()
+        chip.wantsLayer = true
+        chip.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.15).cgColor
+        chip.layer?.cornerRadius = 6
+        chip.translatesAutoresizingMaskIntoConstraints = false
+
+        let stack = NSStackView()
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 4
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        chip.addSubview(stack)
+
+        if let icon = appInfo?.icon {
+            let iconView = NSImageView(image: icon)
+            iconView.imageScaling = .scaleProportionallyUpOrDown
+            iconView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                iconView.widthAnchor.constraint(equalToConstant: 14),
+                iconView.heightAnchor.constraint(equalToConstant: 14)
+            ])
+            stack.addArrangedSubview(iconView)
+        }
+
+        let displayName = appInfo?.name ?? bundleId
+        let label = NSTextField(labelWithString: displayName)
+        label.font = NSFont.systemFont(ofSize: 11)
+        label.textColor = .labelColor
+        label.lineBreakMode = .byTruncatingTail
+        label.maximumNumberOfLines = 1
+        stack.addArrangedSubview(label)
+
+        let removeButton = NSButton()
+        removeButton.bezelStyle = .inline
+        removeButton.isBordered = false
+        removeButton.title = ""
+        if let xImage = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Remove") {
+            xImage.isTemplate = true
+            removeButton.image = xImage
+            removeButton.contentTintColor = .secondaryLabelColor
+        }
+        removeButton.target = self
+        removeButton.action = #selector(handleRemoveChip(_:))
+        removeButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            removeButton.widthAnchor.constraint(equalToConstant: 16),
+            removeButton.heightAnchor.constraint(equalToConstant: 16)
+        ])
+
+        let isAutoStart = (container === autoStartChipsContainer)
+        removeButton.tag = isAutoStart ? 1000 : 2000
+        removeButton.identifier = NSUserInterfaceItemIdentifier(bundleId)
+
+        stack.addArrangedSubview(removeButton)
+
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: chip.leadingAnchor, constant: 6),
+            stack.trailingAnchor.constraint(equalTo: chip.trailingAnchor, constant: -6),
+            stack.topAnchor.constraint(equalTo: chip.topAnchor, constant: 4),
+            stack.bottomAnchor.constraint(equalTo: chip.bottomAnchor, constant: -4)
+        ])
+
+        return chip
+    }
+
+    @objc private func handleRemoveChip(_ sender: NSButton) {
+        guard let bundleId = sender.identifier?.rawValue else { return }
+
+        let isAutoStart = sender.tag == 1000
+        let field = isAutoStart ? autoStartAppsField : whitelistField
+        let popup = isAutoStart ? autoStartAppPopup : whitelistAppPopup
+        let container = isAutoStart ? autoStartChipsContainer : whitelistChipsContainer
+        let filter = isAutoStart ? autoStartSearchField.stringValue : whitelistSearchField.stringValue
+
+        var existing = bundleIds(from: field)
+        if let index = existing.firstIndex(of: bundleId) {
+            existing.remove(at: index)
+        }
+        field.stringValue = existing.joined(separator: ", ")
+
+        updateChips(for: container, bundleIds: existing)
+        populateInstalledApps(into: popup, filter: filter)
+    }
+
     private func createModernButton(title: String, symbolName: String) -> NSButton {
         let button = NSButton()
         button.title = title
@@ -491,6 +651,8 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         whitelistField.stringValue = settings.whitelistBundleIds.joined(separator: ", ")
         populateInstalledApps(into: autoStartAppPopup, filter: autoStartSearchField.stringValue)
         populateInstalledApps(into: whitelistAppPopup, filter: whitelistSearchField.stringValue)
+        updateChips(for: autoStartChipsContainer, bundleIds: bundleIds(from: autoStartAppsField))
+        updateChips(for: whitelistChipsContainer, bundleIds: bundleIds(from: whitelistField))
     }
 
     @objc private func handleSave() {
@@ -530,6 +692,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         let popup = isAutoStart ? autoStartAppPopup : whitelistAppPopup
         let field = isAutoStart ? autoStartAppsField : whitelistField
         let filter = isAutoStart ? autoStartSearchField.stringValue : whitelistSearchField.stringValue
+        let container = isAutoStart ? autoStartChipsContainer : whitelistChipsContainer
         
         let actionType = tag % 1000
         
@@ -544,6 +707,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
             }
             populateInstalledApps(into: popup, filter: filter)
             selectPlaceholder(in: popup)
+            updateChips(for: container, bundleIds: bundleIds(from: field))
         default:
             selectPlaceholder(in: popup)
         }
