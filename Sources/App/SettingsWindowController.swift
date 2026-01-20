@@ -438,6 +438,8 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         popup.pullsDown = false
         popup.controlSize = .regular
         popup.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        popup.target = self
+        popup.action = #selector(handlePopupSelection(_:))
         popup.menu = NSMenu(title: menuTitle)
         popup.menu?.delegate = self
         configureMenuSearchField(searchField)
@@ -713,6 +715,15 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         }
     }
 
+    @objc private func handlePopupSelection(_ sender: NSPopUpButton) {
+        guard let selectedItem = sender.selectedItem else { return }
+        if let bundleId = selectedItem.representedObject as? String {
+            applySelection(bundleId, for: sender)
+            return
+        }
+        handlePopupMenuItem(selectedItem)
+    }
+
     private func populateInstalledApps(into popup: NSPopUpButton, filter: String) {
         popup.removeAllItems()
         if popup.menu == nil {
@@ -749,8 +760,6 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
             item.representedObject = app.bundleId
             item.tag = baseTag + 2
             item.state = selectedIds.contains(app.bundleId) ? .on : .off
-            item.target = self
-            item.action = #selector(handlePopupMenuItem(_:))
             popup.menu?.addItem(item)
         }
 
@@ -760,6 +769,17 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         refresh.action = #selector(handlePopupMenuItem(_:))
         popup.menu?.addItem(refresh)
         selectPlaceholder(in: popup)
+    }
+
+    private func applySelection(_ bundleId: String, for popup: NSPopUpButton) {
+        let field = field(for: popup)
+        let filter = searchField(for: popup).stringValue
+        let container = (popup === autoStartAppPopup) ? autoStartChipsContainer : whitelistChipsContainer
+
+        toggleBundleId(bundleId, in: field)
+        populateInstalledApps(into: popup, filter: filter)
+        selectPlaceholder(in: popup)
+        updateChips(for: container, bundleIds: bundleIds(from: field))
     }
 
     private func field(for popup: NSPopUpButton) -> NSTextField {

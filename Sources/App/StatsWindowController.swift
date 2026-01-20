@@ -99,6 +99,12 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         motivationLabel = motivation
         mainStack.addArrangedSubview(motivation)
 
+        let resetButton = NSButton(title: "Reset All Stats", target: self, action: #selector(resetButtonClicked))
+        resetButton.bezelStyle = .rounded
+        resetButton.controlSize = .regular
+        resetButton.contentTintColor = .systemRed
+        mainStack.addArrangedSubview(resetButton)
+
         NSLayoutConstraint.activate([
             backgroundView.topAnchor.constraint(equalTo: contentView.topAnchor),
             backgroundView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -440,5 +446,24 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         row.addArrangedSubview(valueField)
 
         return (row, valueField)
+    }
+
+    @objc private func resetButtonClicked() {
+        guard let window = self.window else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Reset All Statistics?"
+        alert.informativeText = "This will permanently delete all your pomodoro statistics. This action cannot be undone."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Reset")
+        alert.addButton(withTitle: "Cancel")
+
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self = self else { return }
+            if response == .alertFirstButtonReturn {
+                self.statsStore.clearAll()
+                self.updateStats()
+            }
+        }
     }
 }

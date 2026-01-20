@@ -34,9 +34,11 @@ final class FocusStateDetector {
         var focusedWindow: AnyObject?
         let error = AXUIElementCopyAttributeValue(systemWide, kAXFocusedWindowAttribute as CFString, &focusedWindow)
         guard error == .success, let window = focusedWindow else { return false }
+        // swiftlint:disable:next force_cast
+        let windowElement = window as! AXUIElement
 
         var fullscreenValue: AnyObject?
-        let fullscreenError = AXUIElementCopyAttributeValue(window as! AXUIElement, "AXFullScreen" as CFString, &fullscreenValue)
+        let fullscreenError = AXUIElementCopyAttributeValue(windowElement, "AXFullScreen" as CFString, &fullscreenValue)
         guard fullscreenError == .success else { return false }
         if let value = fullscreenValue as? Bool {
             return value

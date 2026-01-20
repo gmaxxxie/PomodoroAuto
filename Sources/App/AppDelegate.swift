@@ -2,8 +2,10 @@ import AppKit
 import Foundation
 import UserNotifications
 import QuartzCore
+import os.log
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "PomodoroAuto", category: "AppDelegate")
     private enum SessionState {
         case idle
         case running
@@ -16,10 +18,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let detector = FocusStateDetector()
     private var ruleEngine: RuleEngine
     private let statsStore = StatsStore()
-    private let cache = StateCache(maxCount: 1000)
     private let workTimer: PomodoroTimer
     private let breakTimer: PomodoroTimer
     private let menuBar: MenuBarController
+    
+    private var settingsWindow: SettingsWindowController?
+    private var statsWindow: StatsWindowController?
+    private var focusTimer: DispatchSourceTimer?
+    private var activeSessionStart: Date?
+    private var accumulatedWorkSeconds = 0
+    private var state: SessionState = .idle
 
     override init() {
         self.ruleEngine = RuleEngine(config: settings.ruleConfig)
@@ -89,9 +97,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func configureNotifications() {
-        // UNUserNotificationCenter requires a valid app bundle
         guard Bundle.main.bundleIdentifier != nil else {
-            print("[DEBUG] Skipping notifications - not running as app bundle")
+            Self.logger.info("Skipping notifications - not running as app bundle")
             return
         }
         let center = UNUserNotificationCenter.current()
@@ -111,31 +118,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func pollFocusState() {
         guard settings.autoStart else {
-            print("[DEBUG] autoStart is disabled")
+            Self.logger.debug("autoStart is disabled")
             return
         }
         guard detector.isAccessibilityTrusted else {
-            print("[DEBUG] Accessibility not trusted")
+            Self.logger.debug("Accessibility not trusted")
             return
         }
         guard let snapshot = detector.snapshot() else {
-            print("[DEBUG] Could not get snapshot")
+            Self.logger.debug("Could not get snapshot")
             return
         }
 
-        // Ignore self - don't pause when user clicks our menu bar
-        if snapshot.bundleId == "com.pomodoroauto.app" {
+        if snapshot.bundleId == Bundle.main.bundleIdentifier {
             return
         }
-
-        cache.append(snapshot: snapshot)
 
         let runningBundleIds = detector.runningBundleIds()
         let allowlist = Set(settings.autoStartBundleIds)
         let runningAllowlistApps = allowlist.intersection(runningBundleIds)
-        let isWork = !runningAllowlistApps.isEmpty
+        let isAllowlistAppRunning = !runningAllowlistApps.isEmpty
+        let focusedAppIsWork = ruleEngine.isWork(snapshot: snapshot)
+        let isWork = isAllowlistAppRunning && focusedAppIsWork
         
-        print("[DEBUG] App: \(snapshot.bundleId), isWork: \(isWork), running allowlist apps: \(runningAllowlistApps)")
+        Self.logger.debug("App: \(snapshot.bundleId), isWork: \(isWork), running allowlist apps: \(runningAllowlistApps)")
         if isWork {
             if !workTimer.isRunning && !breakTimer.isRunning {
                 startTimer()
@@ -351,5 +357,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let originX = visibleFrame.maxX - frame.width - margin
         let originY = visibleFrame.maxY - frame.height - margin
         window.setFrameOrigin(NSPoint(x: originX, y: originY))
+    }
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        focusTimer?.cancel()
+        workTimer.pause()
+        breakTimer.pause()
     }
 }

@@ -95,4 +95,22 @@ final class StatsStoreTests: XCTestCase {
         XCTAssertEqual(avg.avgWorkSeconds, 0.0)
         XCTAssertEqual(avg.avgPomodoroCount, 0.0)
     }
+
+    func testClearAllRemovesAllStats() {
+        store.addWorkSeconds(100)
+        store.incrementPomodoro()
+
+        store.clearAll()
+
+        let stats = store.statsForToday()
+        XCTAssertEqual(stats.workSeconds, 0)
+        XCTAssertEqual(stats.pomodoroCount, 0)
+
+        let all = store.allStats()
+        XCTAssertTrue(all.isEmpty)
+
+        let total = store.totalStats()
+        XCTAssertEqual(total.workSeconds, 0)
+        XCTAssertEqual(total.pomodoroCount, 0)
+    }
 }

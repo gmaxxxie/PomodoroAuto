@@ -172,6 +172,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         progLayer.frame = CGRect(x: 0, y: 0, width: size, height: size)
         progLayer.isHidden = true
         progressLayer = progLayer
+        
+        button.layer?.addSublayer(bgLayer)
+        button.layer?.addSublayer(progLayer)
     }
 
     private func updateProgressRing(remaining: Int) {

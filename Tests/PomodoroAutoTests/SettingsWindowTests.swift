@@ -56,6 +56,52 @@ final class SettingsWindowTests: XCTestCase {
         XCTAssertNotNil(textField, "Could not find Whitelist text field")
         XCTAssertEqual(textField?.stringValue, "com.test.whitelist")
     }
+
+    func testSelectingAutoStartAppFromPopupUpdatesField() {
+        guard let popup = findPopUpButton(menuTitle: "autoStartApps") else {
+            XCTFail("Could not find auto-start app popup")
+            return
+        }
+
+        let item = NSMenuItem(title: "Popup App", action: nil, keyEquivalent: "")
+        item.tag = 1002
+        item.representedObject = "com.test.popup"
+        popup.menu?.addItem(item)
+        popup.select(item)
+
+        guard let action = popup.action, let target = popup.target else {
+            XCTFail("Auto-start popup action should be wired")
+            return
+        }
+
+        _ = target.perform(action, with: popup)
+
+        let textField = findTextField(placeholder: "com.apple.Terminal, com.apple.dt.Xcode")
+        XCTAssertEqual(textField?.stringValue, "com.test.popup")
+    }
+
+    func testPopupSelectionUsesRepresentedObjectWhenTagIsZero() {
+        guard let popup = findPopUpButton(menuTitle: "autoStartApps") else {
+            XCTFail("Could not find auto-start app popup")
+            return
+        }
+
+        let item = NSMenuItem(title: "Popup App", action: nil, keyEquivalent: "")
+        item.tag = 0
+        item.representedObject = "com.test.popup.zero"
+        popup.menu?.addItem(item)
+        popup.select(item)
+
+        guard let action = popup.action, let target = popup.target else {
+            XCTFail("Auto-start popup action should be wired")
+            return
+        }
+
+        _ = target.perform(action, with: popup)
+
+        let textField = findTextField(placeholder: "com.apple.Terminal, com.apple.dt.Xcode")
+        XCTAssertEqual(textField?.stringValue, "com.test.popup.zero")
+    }
     
     // MARK: - Save Settings Tests
     
@@ -439,7 +485,8 @@ final class SettingsWindowTests: XCTestCase {
                     }
                 }
                 if hasFlowContainer || stack.arrangedSubviews.isEmpty {
-                    if let parentSection = findParentSection(of: stack, in: controller.window?.contentView) {
+                    let parentSection = findParentSection(of: stack, in: controller.window?.contentView)
+                    if !parentSection.isEmpty {
                         let isAutoStartSection = parentSection.contains("Auto Start") || parentSection.contains("Terminal")
                         if isAutoStart == isAutoStartSection {
                             return stack
@@ -513,6 +560,24 @@ final class SettingsWindowTests: XCTestCase {
         
         for subview in view.subviews {
             if let found = findRemoveButton(in: subview, forBundleId: bundleId) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    private func findPopUpButton(menuTitle: String) -> NSPopUpButton? {
+        guard let contentView = controller.window?.contentView else { return nil }
+        return findPopUpButton(in: contentView, menuTitle: menuTitle)
+    }
+
+    private func findPopUpButton(in view: NSView, menuTitle: String) -> NSPopUpButton? {
+        if let popup = view as? NSPopUpButton, popup.menu?.title == menuTitle {
+            return popup
+        }
+
+        for subview in view.subviews {
+            if let found = findPopUpButton(in: subview, menuTitle: menuTitle) {
                 return found
             }
         }
