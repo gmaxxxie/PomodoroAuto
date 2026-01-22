@@ -7,6 +7,15 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
     private var pomodoroValueLabel: NSTextField?
     private var progressRingLayer: CAShapeLayer?
     private var motivationLabel: NSTextField?
+    private var subtitleLabel: NSTextField?
+    private var resetButton: NSButton?
+    private var statsCardTitleLabel: NSTextField?
+    private var allTimeTitleLabel: NSTextField?
+    private var totalPomodorosTitleLabel: NSTextField?
+    private var totalWorkTimeTitleLabel: NSTextField?
+    private var avgPomodorosTitleLabel: NSTextField?
+    private var avgWorkTimeTitleLabel: NSTextField?
+    private var daysTrackedTitleLabel: NSTextField?
     private let dailyGoalPomodoros = 8
 
     private var totalPomodoroLabel: NSTextField?
@@ -23,7 +32,7 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Stats"
+        window.title = Localization.localized("stats.title")
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.titleVisibility = .hidden
@@ -92,17 +101,18 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         let allTimeCard = createAllTimeCard()
         mainStack.addArrangedSubview(allTimeCard)
 
-        let motivation = NSTextField(labelWithString: "Keep going!")
+        let motivation = NSTextField(labelWithString: Localization.localized("stats.keepGoing"))
         motivation.font = NSFont.systemFont(ofSize: 13, weight: .medium)
         motivation.textColor = .secondaryLabelColor
         motivation.alignment = .center
         motivationLabel = motivation
         mainStack.addArrangedSubview(motivation)
 
-        let resetButton = NSButton(title: "Reset All Stats", target: self, action: #selector(resetButtonClicked))
+        let resetButton = NSButton(title: Localization.localized("stats.resetAll"), target: self, action: #selector(resetButtonClicked))
         resetButton.bezelStyle = .rounded
         resetButton.controlSize = .regular
         resetButton.contentTintColor = .systemRed
+        self.resetButton = resetButton
         mainStack.addArrangedSubview(resetButton)
 
         NSLayoutConstraint.activate([
@@ -168,12 +178,13 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         container.addSubview(centerLabel)
         pomodoroValueLabel = centerLabel
 
-        let subtitleLabel = NSTextField(labelWithString: "pomodoros")
+        let subtitleLabel = NSTextField(labelWithString: Localization.localized("stats.subtitle.pomodoros"))
         subtitleLabel.font = NSFont.systemFont(ofSize: 11)
         subtitleLabel.textColor = .tertiaryLabelColor
         subtitleLabel.alignment = .center
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(subtitleLabel)
+        self.subtitleLabel = subtitleLabel
 
         NSLayoutConstraint.activate([
             centerLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
@@ -208,9 +219,10 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         textStack.alignment = .leading
         textStack.spacing = 2
 
-        let labelView = NSTextField(labelWithString: "Total work time")
+        let labelView = NSTextField(labelWithString: Localization.localized("stats.totalWorkTime"))
         labelView.font = NSFont.systemFont(ofSize: 12)
         labelView.textColor = .secondaryLabelColor
+        statsCardTitleLabel = labelView
 
         let valueView = NSTextField(labelWithString: "--:--")
         valueView.font = NSFont.monospacedDigitSystemFont(ofSize: 20, weight: .semibold)
@@ -283,15 +295,15 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
     private func updateMotivation(pomodoroCount: Int) {
         let message: String
         if pomodoroCount == 0 {
-            message = "Start your first pomodoro!"
+            message = Localization.localized("stats.motivation.start")
         } else if pomodoroCount < dailyGoalPomodoros / 2 {
-            message = "Good start! Keep it up!"
+            message = Localization.localized("stats.motivation.goodStart")
         } else if pomodoroCount < dailyGoalPomodoros {
-            message = "Halfway there! You're doing great!"
+            message = Localization.localized("stats.motivation.halfway")
         } else if pomodoroCount == dailyGoalPomodoros {
-            message = "Goal achieved! Amazing work!"
+            message = Localization.localized("stats.motivation.goal")
         } else {
-            message = "Above and beyond! You're on fire!"
+            message = Localization.localized("stats.motivation.above")
         }
         motivationLabel?.stringValue = message
 
@@ -324,9 +336,10 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         outerStack.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(outerStack)
 
-        let titleLabel = NSTextField(labelWithString: "All Time")
+        let titleLabel = NSTextField(labelWithString: Localization.localized("stats.allTime"))
         titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
         titleLabel.textColor = .labelColor
+        allTimeTitleLabel = titleLabel
         outerStack.addArrangedSubview(titleLabel)
 
         let gridStack = NSStackView()
@@ -337,46 +350,51 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         let totalPomodoroRow = createStatRow(
             symbolName: "checkmark.circle.fill",
             color: .systemGreen,
-            label: "Total Pomodoros",
+            label: Localization.localized("stats.totalPomodoros"),
             value: "0"
         )
         totalPomodoroLabel = totalPomodoroRow.valueLabel
+        totalPomodorosTitleLabel = totalPomodoroRow.titleLabel
         gridStack.addArrangedSubview(totalPomodoroRow.view)
 
         let totalWorkRow = createStatRow(
             symbolName: "clock.fill",
             color: .systemBlue,
-            label: "Total Work Time",
+            label: Localization.localized("stats.totalWorkTimeAll"),
             value: "--:--"
         )
         totalWorkTimeLabel = totalWorkRow.valueLabel
+        totalWorkTimeTitleLabel = totalWorkRow.titleLabel
         gridStack.addArrangedSubview(totalWorkRow.view)
 
         let avgPomodoroRow = createStatRow(
             symbolName: "chart.bar.fill",
             color: .systemOrange,
-            label: "Avg Pomodoros/Day",
+            label: Localization.localized("stats.avgPomodorosPerDay"),
             value: "0.0"
         )
         avgPomodoroLabel = avgPomodoroRow.valueLabel
+        avgPomodorosTitleLabel = avgPomodoroRow.titleLabel
         gridStack.addArrangedSubview(avgPomodoroRow.view)
 
         let avgWorkRow = createStatRow(
             symbolName: "hourglass",
             color: .systemPurple,
-            label: "Avg Work Time/Day",
+            label: Localization.localized("stats.avgWorkTimePerDay"),
             value: "--:--"
         )
         avgWorkTimeLabel = avgWorkRow.valueLabel
+        avgWorkTimeTitleLabel = avgWorkRow.titleLabel
         gridStack.addArrangedSubview(avgWorkRow.view)
 
         let dayCountRow = createStatRow(
             symbolName: "calendar",
             color: .systemTeal,
-            label: "Days Tracked",
+            label: Localization.localized("stats.daysTracked"),
             value: "0"
         )
         dayCountLabel = dayCountRow.valueLabel
+        daysTrackedTitleLabel = dayCountRow.titleLabel
         gridStack.addArrangedSubview(dayCountRow.view)
 
         outerStack.addArrangedSubview(gridStack)
@@ -397,7 +415,7 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         color: NSColor,
         label: String,
         value: String
-    ) -> (view: NSView, valueLabel: NSTextField) {
+    ) -> (view: NSView, titleLabel: NSTextField, valueLabel: NSTextField) {
         let row = NSStackView()
         row.orientation = .horizontal
         row.alignment = .centerY
@@ -445,18 +463,18 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         valueField.alignment = .right
         row.addArrangedSubview(valueField)
 
-        return (row, valueField)
+        return (row, labelField, valueField)
     }
 
     @objc private func resetButtonClicked() {
         guard let window = self.window else { return }
 
         let alert = NSAlert()
-        alert.messageText = "Reset All Statistics?"
-        alert.informativeText = "This will permanently delete all your pomodoro statistics. This action cannot be undone."
+        alert.messageText = Localization.localized("stats.reset.alert.title")
+        alert.informativeText = Localization.localized("stats.reset.alert.body")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Reset")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: Localization.localized("stats.reset.alert.reset"))
+        alert.addButton(withTitle: Localization.localized("stats.reset.alert.cancel"))
 
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self = self else { return }
@@ -465,5 +483,19 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
                 self.updateStats()
             }
         }
+    }
+
+    func applyLocalization() {
+        window?.title = Localization.localized("stats.title")
+        subtitleLabel?.stringValue = Localization.localized("stats.subtitle.pomodoros")
+        statsCardTitleLabel?.stringValue = Localization.localized("stats.totalWorkTime")
+        allTimeTitleLabel?.stringValue = Localization.localized("stats.allTime")
+        totalPomodorosTitleLabel?.stringValue = Localization.localized("stats.totalPomodoros")
+        totalWorkTimeTitleLabel?.stringValue = Localization.localized("stats.totalWorkTimeAll")
+        avgPomodorosTitleLabel?.stringValue = Localization.localized("stats.avgPomodorosPerDay")
+        avgWorkTimeTitleLabel?.stringValue = Localization.localized("stats.avgWorkTimePerDay")
+        daysTrackedTitleLabel?.stringValue = Localization.localized("stats.daysTracked")
+        resetButton?.title = Localization.localized("stats.resetAll")
+        updateMotivation(pomodoroCount: statsStore.statsForToday().pomodoroCount)
     }
 }

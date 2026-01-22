@@ -23,14 +23,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private let statusItem: NSStatusItem
     private let menu: NSMenu
-    private let statusTitleItem = NSMenuItem(title: "Idle", action: nil, keyEquivalent: "")
-    private let pomodoroStatsItem = NSMenuItem(title: "🍅 0 pomodoros", action: nil, keyEquivalent: "")
+    private let statusTitleItem = NSMenuItem(title: Localization.localized("menu.status.idle"), action: nil, keyEquivalent: "")
+    private let pomodoroStatsItem = NSMenuItem(title: "🍅 0", action: nil, keyEquivalent: "")
     private let workTimeStatsItem = NSMenuItem(title: "⏱ 00:00", action: nil, keyEquivalent: "")
+    private var toggleItem: NSMenuItem?
+    private var resetItem: NSMenuItem?
+    private var statsItem: NSMenuItem?
+    private var settingsItem: NSMenuItem?
+    private var quitItem: NSMenuItem?
     private var currentMode: TimerMode = .idle
     private var totalDuration: Int = 25 * 60
     private var progressLayer: CAShapeLayer?
     private var backgroundLayer: CAShapeLayer?
-    private var menuBarIcon: NSImage?
 
     init(
         onToggle: (() -> Void)? = nil,
@@ -49,30 +53,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.menu = NSMenu()
         super.init()
-        loadMenuBarIcon()
         buildMenu()
         configureStatusItem()
         setupProgressRing()
         menu.delegate = self
-    }
-
-    private func loadMenuBarIcon() {
-        // Try Bundle.module first (Swift Package resources)
-        if let url = Bundle.module.url(forResource: "menubar-icon-template", withExtension: "pdf") {
-            if let image = NSImage(contentsOf: url) {
-                image.isTemplate = true
-                image.size = NSSize(width: 18, height: 18)
-                menuBarIcon = image
-                return
-            }
-        }
-        
-        // Fallback to named image
-        if let image = NSImage(named: "menubar-icon-template") {
-            image.isTemplate = true
-            image.size = NSSize(width: 18, height: 18)
-            menuBarIcon = image
-        }
+        refreshLocalizedStrings()
     }
 
     // MARK: - NSMenuDelegate
@@ -83,8 +68,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     func refreshStats() {
         guard let stats = statsProvider?() else { return }
-        pomodoroStatsItem.title = "  \(stats.pomodoroCount) pomodoro\(stats.pomodoroCount == 1 ? "" : "s")"
-        workTimeStatsItem.title = "  \(formatDuration(stats.workSeconds))"
+        pomodoroStatsItem.title = "  \(Localization.localizedFormat("menu.stats.pomodoros", stats.pomodoroCount))"
+        workTimeStatsItem.title = "  \(Localization.localizedFormat("menu.stats.workTime", formatDuration(stats.workSeconds)))"
     }
 
     private func formatDuration(_ seconds: Int) -> String {
@@ -92,34 +77,31 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let hours = clamped / 3600
         let minutes = (clamped % 3600) / 60
         if hours > 0 {
-            return String(format: "%dh %02dm", hours, minutes)
+            return Localization.localizedFormat("menu.duration.hoursMinutes", hours, minutes)
         }
-        return String(format: "%dm", minutes)
+        return Localization.localizedFormat("menu.duration.minutes", minutes)
     }
 
     func setTotalDuration(seconds: Int) {
         totalDuration = max(1, seconds)
     }
 
-    func setRemaining(seconds: Int, label: String = "Remaining", isBreak: Bool = false) {
+    func setRemaining(seconds: Int, label: String? = nil, isBreak: Bool = false) {
         let minutes = seconds / 60
         let secs = seconds % 60
         let text = String(format: "%02d:%02d", minutes, secs)
         statusItem.button?.title = text
-        statusTitleItem.title = "\(label): \(text)"
+        let resolvedLabel = label ?? Localization.localized("menu.status.remaining")
+        statusTitleItem.title = "\(resolvedLabel): \(text)"
         currentMode = isBreak ? .rest : .work
         updateStatusIcon(isRunning: true)
         updateProgressRing(remaining: seconds)
     }
 
-    func setStatus(text: String) {
+    func setStatus(text: String, mode: TimerMode) {
         statusItem.button?.title = ""
         statusTitleItem.title = text
-        if text == "Paused" {
-            currentMode = .paused
-        } else {
-            currentMode = .idle
-        }
+        currentMode = mode
         updateStatusIcon(isRunning: false)
         updateProgressRing(remaining: 0)
     }
@@ -133,12 +115,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func updateStatusIcon(isRunning: Bool) {
         guard let button = statusItem.button else { return }
 
-        if let icon = menuBarIcon {
-            button.image = icon
-            button.imagePosition = .imageLeading
-            return
-        }
-
         let symbolName: String
         switch currentMode {
         case .work:
@@ -146,15 +122,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .rest:
             symbolName = "cup.and.saucer.fill"
         case .paused:
-            symbolName = "pause.circle.fill"
+            symbolName = "pause.circle"
         case .idle:
             symbolName = "timer.circle"
         }
 
-        if let icon = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Pomodoro") {
+        if let icon = NSImage(systemSymbolName: symbolName, accessibilityDescription: Localization.localized("menu.accessibility.pomodoro")) {
             icon.isTemplate = true
+            icon.size = NSSize(width: 18, height: 18)
             button.image = icon
             button.imagePosition = .imageLeading
+            if #available(macOS 10.14, *) {
+                button.contentTintColor = .labelColor
+            }
         } else {
             button.image = nil
             button.title = "🍅"
@@ -259,13 +239,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(statusTitleItem)
         menu.addItem(.separator())
 
-        let pomodoroIcon = NSImage(systemSymbolName: "target", accessibilityDescription: "Pomodoros")
+        let pomodoroIcon = NSImage(systemSymbolName: "target", accessibilityDescription: Localization.localized("menu.accessibility.pomodoros"))
         pomodoroIcon?.isTemplate = true
         pomodoroStatsItem.image = pomodoroIcon
         pomodoroStatsItem.isEnabled = false
         menu.addItem(pomodoroStatsItem)
 
-        let clockIcon = NSImage(systemSymbolName: "clock.fill", accessibilityDescription: "Work time")
+        let clockIcon = NSImage(systemSymbolName: "clock.fill", accessibilityDescription: Localization.localized("menu.accessibility.workTime"))
         clockIcon?.isTemplate = true
         workTimeStatsItem.image = clockIcon
         workTimeStatsItem.isEnabled = false
@@ -274,47 +254,52 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         let toggleItem = createMenuItem(
-            title: "Start/Pause",
+            title: Localization.localized("menu.title.startPause"),
             symbolName: "playpause.circle.fill",
             keyEquivalent: " ",
             action: #selector(handleToggle)
         )
+        self.toggleItem = toggleItem
         menu.addItem(toggleItem)
 
         let resetItem = createMenuItem(
-            title: "Reset",
+            title: Localization.localized("menu.title.reset"),
             symbolName: "arrow.counterclockwise.circle.fill",
             keyEquivalent: "r",
             action: #selector(handleReset)
         )
+        self.resetItem = resetItem
         menu.addItem(resetItem)
 
         menu.addItem(.separator())
 
         let statsItem = createMenuItem(
-            title: "Stats",
+            title: Localization.localized("menu.title.stats"),
             symbolName: "chart.bar.fill",
             keyEquivalent: "s",
             action: #selector(handleStats)
         )
+        self.statsItem = statsItem
         menu.addItem(statsItem)
 
         let settingsItem = createMenuItem(
-            title: "Settings",
+            title: Localization.localized("menu.title.settings"),
             symbolName: "gearshape.fill",
             keyEquivalent: ",",
             action: #selector(handleSettings)
         )
+        self.settingsItem = settingsItem
         menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
         let quitItem = createMenuItem(
-            title: "Quit",
+            title: Localization.localized("menu.title.quit"),
             symbolName: "power",
             keyEquivalent: "q",
             action: #selector(handleQuit)
         )
+        self.quitItem = quitItem
         menu.addItem(quitItem)
 
         statusItem.menu = menu
@@ -329,6 +314,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             item.image = image
         }
         return item
+    }
+
+    func refreshLocalizedStrings() {
+        statusTitleItem.title = Localization.localized("menu.status.idle")
+        toggleItem?.title = Localization.localized("menu.title.startPause")
+        resetItem?.title = Localization.localized("menu.title.reset")
+        statsItem?.title = Localization.localized("menu.title.stats")
+        settingsItem?.title = Localization.localized("menu.title.settings")
+        quitItem?.title = Localization.localized("menu.title.quit")
+        refreshStats()
     }
 
     @objc private func handleToggle() {

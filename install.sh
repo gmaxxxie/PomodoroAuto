@@ -19,6 +19,9 @@ fi
 echo "📦 Building..."
 swift build --configuration release
 
+# Resolve build output path for resources
+BUILD_BIN_DIR="$(swift build --configuration release --show-bin-path)"
+
 # Get architecture
 ARCH=$(uname -m)
 BUILD_DIR=".build/release"
@@ -37,6 +40,14 @@ mkdir -p "$APP_RESOURCES"
 
 # Copy executable
 cp "$BUILD_DIR/PomodoroAuto" "$APP_MACOS/"
+
+# Copy SwiftPM resource bundle (localizations, assets)
+RESOURCE_BUNDLE=$(find "$BUILD_BIN_DIR" -maxdepth 1 -name "PomodoroAuto_*.bundle" -print -quit)
+if [[ -n "$RESOURCE_BUNDLE" ]]; then
+    cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/"
+else
+    echo "⚠️  Warning: Resource bundle not found; localized strings may not load."
+fi
 
 # Copy app icon
 if [[ ! -f "$APP_ICON" ]]; then
@@ -65,9 +76,9 @@ cat > "$APP_CONTENTS/Info.plist" << 'EOF'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>20260122.1</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>20260122.1</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>NSPrincipalClass</key>

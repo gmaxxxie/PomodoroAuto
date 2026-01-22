@@ -1,20 +1,25 @@
 import AppKit
 
 final class SettingsWindowController: NSWindowController, NSMenuDelegate {
+    private enum Layout {
+        static let cardMaxWidth: CGFloat = 620
+        static let cardMinWidth: CGFloat = 520
+    }
     private let settings: SettingsStore
     private let statsStore: StatsStore
     private let onSave: () -> Void
 
     private let workMinutesField = NSTextField()
     private let breakMinutesField = NSTextField()
-    private let autoStartCheckbox = NSButton(checkboxWithTitle: "Auto start/pause", target: nil, action: nil)
+    private let autoStartCheckbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let autoStartAppsField = NSTextField()
     private let autoStartAppPopup = NSPopUpButton()
     private let autoStartSearchField = NSSearchField()
-    private let fullscreenRuleCheckbox = NSButton(checkboxWithTitle: "Fullscreen non-work", target: nil, action: nil)
+    private let fullscreenRuleCheckbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let whitelistField = NSTextField()
     private let whitelistAppPopup = NSPopUpButton()
     private let whitelistSearchField = NSSearchField()
+    private let languagePopup = NSPopUpButton()
     private var installedAppsCache: [AppInfo] = []
 
     private let autoStartChipsContainer = NSStackView()
@@ -36,7 +41,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Settings"
+        window.title = Localization.localized("settings.title")
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.titleVisibility = .hidden
@@ -88,17 +93,19 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         stack.translatesAutoresizingMaskIntoConstraints = false
         documentView.addSubview(stack)
 
-        let timingSection = createCardSection(content: createTimingSection())
-        let autoStartSection = createCardSection(content: createAutoStartSection())
-        let fullscreenSection = createCardSection(content: createFullscreenSection())
-        let resetSection = createCardSection(content: createResetSection())
+        let languageSection = wrapCard(createCardSection(content: createLanguageSection()))
+        let timingSection = wrapCard(createCardSection(content: createTimingSection()))
+        let autoStartSection = wrapCard(createCardSection(content: createAutoStartSection()))
+        let fullscreenSection = wrapCard(createCardSection(content: createFullscreenSection()))
+        let resetSection = wrapCard(createCardSection(content: createResetSection()))
 
+        stack.addArrangedSubview(languageSection)
         stack.addArrangedSubview(timingSection)
         stack.addArrangedSubview(autoStartSection)
         stack.addArrangedSubview(fullscreenSection)
         stack.addArrangedSubview(resetSection)
 
-        let saveButton = createModernButton(title: "Save", symbolName: "checkmark.circle.fill")
+        let saveButton = createModernButton(title: Localization.localized("settings.save"), symbolName: "checkmark.circle.fill")
         saveButton.target = self
         saveButton.action = #selector(handleSave)
         saveButton.translatesAutoresizingMaskIntoConstraints = false
@@ -140,7 +147,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         section.alignment = .leading
         section.spacing = 16
 
-        let title = createSectionTitle(title: "Timing", symbolName: "clock", color: .systemGreen)
+        let title = createSectionTitle(title: Localization.localized("settings.section.timing"), symbolName: "clock", color: .systemGreen)
         section.addArrangedSubview(title)
 
         let fieldsStack = NSStackView()
@@ -148,13 +155,33 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         fieldsStack.alignment = .top
         fieldsStack.spacing = 24
 
-        let workRow = createLabeledRow(label: "Work minutes", field: workMinutesField, placeholder: "25")
-        let breakRow = createLabeledRow(label: "Break minutes", field: breakMinutesField, placeholder: "5")
+        let workRow = createLabeledRow(label: Localization.localized("settings.workMinutes"), field: workMinutesField, placeholder: "25")
+        let breakRow = createLabeledRow(label: Localization.localized("settings.breakMinutes"), field: breakMinutesField, placeholder: "5")
 
         fieldsStack.addArrangedSubview(workRow)
         fieldsStack.addArrangedSubview(breakRow)
 
         section.addArrangedSubview(fieldsStack)
+
+        return section
+    }
+
+    private func createLanguageSection() -> NSStackView {
+        let section = NSStackView()
+        section.orientation = .vertical
+        section.alignment = .leading
+        section.spacing = 14
+
+        let title = createSectionTitle(title: Localization.localized("settings.section.language"), symbolName: "globe", color: .systemTeal)
+        section.addArrangedSubview(title)
+
+        let description = createInfoLabel(text: Localization.localized("settings.language.description"))
+        section.addArrangedSubview(description)
+
+        configureLanguagePopup()
+        languagePopup.controlSize = .regular
+        languagePopup.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        section.addArrangedSubview(languagePopup)
 
         return section
     }
@@ -165,20 +192,21 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         section.alignment = .leading
         section.spacing = 14
 
-        let title = createSectionTitle(title: "Auto Start", symbolName: "play.circle.fill", color: .systemBlue)
+        let title = createSectionTitle(title: Localization.localized("settings.section.autoStart"), symbolName: "play.circle.fill", color: .systemBlue)
         section.addArrangedSubview(title)
 
+        autoStartCheckbox.title = Localization.localized("settings.autoStart")
         autoStartCheckbox.controlSize = .regular
         autoStartCheckbox.font = NSFont.systemFont(ofSize: 13)
         section.addArrangedSubview(autoStartCheckbox)
 
-        let appsLabel = createInfoLabel(text: "Auto-start allowlist (comma-separated)")
+        let appsLabel = createInfoLabel(text: Localization.localized("settings.autoStartAllowlist"))
         section.addArrangedSubview(appsLabel)
 
         let appsRow = createPopupFieldRow(
             field: autoStartAppsField,
             popup: autoStartAppPopup,
-            placeholder: "com.apple.Terminal, com.apple.dt.Xcode",
+            placeholder: Localization.localized("settings.autoStartPlaceholder"),
             searchField: autoStartSearchField,
             menuTitle: "autoStartApps"
         )
@@ -196,20 +224,21 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         section.alignment = .leading
         section.spacing = 14
 
-        let title = createSectionTitle(title: "Fullscreen Rules", symbolName: "rectangle.on.rectangle", color: .systemPurple)
+        let title = createSectionTitle(title: Localization.localized("settings.section.fullscreen"), symbolName: "rectangle.on.rectangle", color: .systemPurple)
         section.addArrangedSubview(title)
 
+        fullscreenRuleCheckbox.title = Localization.localized("settings.fullscreenNonWork")
         fullscreenRuleCheckbox.controlSize = .regular
         fullscreenRuleCheckbox.font = NSFont.systemFont(ofSize: 13)
         section.addArrangedSubview(fullscreenRuleCheckbox)
 
-        let whitelistLabel = createInfoLabel(text: "Fullscreen work allowlist (comma-separated)")
+        let whitelistLabel = createInfoLabel(text: Localization.localized("settings.fullscreenAllowlist"))
         section.addArrangedSubview(whitelistLabel)
 
         let whitelistRow = createPopupFieldRow(
             field: whitelistField,
             popup: whitelistAppPopup,
-            placeholder: "com.apple.TextEdit",
+            placeholder: Localization.localized("settings.fullscreenPlaceholder"),
             searchField: whitelistSearchField,
             menuTitle: "whitelistApps"
         )
@@ -218,7 +247,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         configureChipsContainer(whitelistChipsContainer)
         section.addArrangedSubview(whitelistChipsContainer)
 
-        let note = createNoteLabel(text: "Note: Safari fullscreen is always treated as non-work.")
+        let note = createNoteLabel(text: Localization.localized("settings.fullscreenNote"))
         section.addArrangedSubview(note)
 
         return section
@@ -230,13 +259,13 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         section.alignment = .leading
         section.spacing = 14
 
-        let title = createSectionTitle(title: "Reset", symbolName: "arrow.counterclockwise", color: .systemRed)
+        let title = createSectionTitle(title: Localization.localized("settings.section.reset"), symbolName: "arrow.counterclockwise", color: .systemRed)
         section.addArrangedSubview(title)
 
-        let description = createNoteLabel(text: "Reset all settings to defaults and clear all history records. This action cannot be undone.")
+        let description = createNoteLabel(text: Localization.localized("settings.reset.description"))
         section.addArrangedSubview(description)
 
-        let resetButton = createDangerButton(title: "Reset All Data", symbolName: "trash")
+        let resetButton = createDangerButton(title: Localization.localized("settings.reset.button"), symbolName: "trash")
         resetButton.target = self
         resetButton.action = #selector(handleResetAllData)
         section.addArrangedSubview(resetButton)
@@ -267,11 +296,11 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         guard let window = self.window else { return }
 
         let firstAlert = NSAlert()
-        firstAlert.messageText = "Reset All Data?"
-        firstAlert.informativeText = "This will reset all settings to defaults and clear all history records."
+        firstAlert.messageText = Localization.localized("settings.reset.alert.title")
+        firstAlert.informativeText = Localization.localized("settings.reset.alert.body")
         firstAlert.alertStyle = .warning
-        firstAlert.addButton(withTitle: "Continue")
-        firstAlert.addButton(withTitle: "Cancel")
+        firstAlert.addButton(withTitle: Localization.localized("settings.reset.alert.continue"))
+        firstAlert.addButton(withTitle: Localization.localized("settings.reset.alert.cancel"))
 
         firstAlert.beginSheetModal(for: window) { [weak self] response in
             guard let self = self else { return }
@@ -285,11 +314,11 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         guard let window = self.window else { return }
 
         let secondAlert = NSAlert()
-        secondAlert.messageText = "Are you absolutely sure?"
-        secondAlert.informativeText = "All your settings and history will be permanently deleted. This cannot be undone."
+        secondAlert.messageText = Localization.localized("settings.reset.alert.confirm.title")
+        secondAlert.informativeText = Localization.localized("settings.reset.alert.confirm.body")
         secondAlert.alertStyle = .critical
-        secondAlert.addButton(withTitle: "Reset All Data")
-        secondAlert.addButton(withTitle: "Cancel")
+        secondAlert.addButton(withTitle: Localization.localized("settings.reset.alert.confirm.action"))
+        secondAlert.addButton(withTitle: Localization.localized("settings.reset.alert.cancel"))
 
         secondAlert.beginSheetModal(for: window) { [weak self] response in
             guard let self = self else { return }
@@ -341,6 +370,23 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         ])
 
         return shadowContainer
+    }
+
+    private func wrapCard(_ card: NSView) -> NSView {
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        card.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(card)
+
+        NSLayoutConstraint.activate([
+            card.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            card.topAnchor.constraint(equalTo: container.topAnchor),
+            card.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            card.widthAnchor.constraint(greaterThanOrEqualToConstant: Layout.cardMinWidth),
+            card.widthAnchor.constraint(lessThanOrEqualToConstant: Layout.cardMaxWidth)
+        ])
+
+        return container
     }
 
     private func createSectionTitle(title: String, symbolName: String, color: NSColor = .controlAccentColor) -> NSStackView {
@@ -446,8 +492,39 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         populateInstalledApps(into: popup, filter: searchField.stringValue)
     }
 
+    private func configureLanguagePopup() {
+        languagePopup.removeAllItems()
+
+        languagePopup.addItem(withTitle: Localization.localized("settings.language.system"))
+        languagePopup.lastItem?.representedObject = LanguagePreference.system
+
+        languagePopup.addItem(withTitle: Localization.localized("settings.language.english"))
+        languagePopup.lastItem?.representedObject = LanguagePreference.english
+
+        languagePopup.addItem(withTitle: Localization.localized("settings.language.chineseSimplified"))
+        languagePopup.lastItem?.representedObject = LanguagePreference.chineseSimplified
+    }
+
+    private func selectLanguagePreference(_ preference: LanguagePreference) {
+        let index = languagePopup.itemArray.firstIndex { item in
+            guard let value = item.representedObject as? LanguagePreference else { return false }
+            return value == preference
+        }
+        if let index {
+            languagePopup.selectItem(at: index)
+        }
+    }
+
+    private func languagePreferenceSelection() -> LanguagePreference {
+        guard let item = languagePopup.selectedItem,
+              let preference = item.representedObject as? LanguagePreference else {
+            return .system
+        }
+        return preference
+    }
+
     private func configureMenuSearchField(_ field: NSSearchField) {
-        field.placeholderString = "Filter apps"
+        field.placeholderString = Localization.localized("settings.search.placeholder")
         field.controlSize = .small
         field.sendsSearchStringImmediately = true
         field.target = self
@@ -573,7 +650,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         removeButton.bezelStyle = .inline
         removeButton.isBordered = false
         removeButton.title = ""
-        if let xImage = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Remove") {
+        if let xImage = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: Localization.localized("settings.chip.remove")) {
             xImage.isTemplate = true
             removeButton.image = xImage
             removeButton.contentTintColor = .secondaryLabelColor
@@ -651,6 +728,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         autoStartAppsField.stringValue = settings.autoStartBundleIds.joined(separator: ", ")
         fullscreenRuleCheckbox.state = settings.fullscreenNonWork ? .on : .off
         whitelistField.stringValue = settings.whitelistBundleIds.joined(separator: ", ")
+        selectLanguagePreference(settings.languagePreference)
         populateInstalledApps(into: autoStartAppPopup, filter: autoStartSearchField.stringValue)
         populateInstalledApps(into: whitelistAppPopup, filter: whitelistSearchField.stringValue)
         updateChips(for: autoStartChipsContainer, bundleIds: bundleIds(from: autoStartAppsField))
@@ -667,6 +745,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
 
         settings.autoStartBundleIds = bundleIds(from: autoStartAppsField)
         settings.whitelistBundleIds = bundleIds(from: whitelistField)
+        settings.languagePreference = languagePreferenceSelection()
 
         onSave()
         window?.close()
@@ -741,7 +820,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         popup.menu?.addItem(searchItem)
         popup.menu?.addItem(.separator())
 
-        let placeholder = NSMenuItem(title: "Select installed app...", action: nil, keyEquivalent: "")
+        let placeholder = NSMenuItem(title: Localization.localized("settings.selectApp.placeholder"), action: nil, keyEquivalent: "")
         placeholder.tag = 0
         popup.menu?.addItem(placeholder)
 
@@ -763,7 +842,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
             popup.menu?.addItem(item)
         }
 
-        let refresh = NSMenuItem(title: "Refresh list", action: nil, keyEquivalent: "")
+        let refresh = NSMenuItem(title: Localization.localized("settings.refreshApps"), action: nil, keyEquivalent: "")
         refresh.tag = baseTag + 1
         refresh.target = self
         refresh.action = #selector(handlePopupMenuItem(_:))

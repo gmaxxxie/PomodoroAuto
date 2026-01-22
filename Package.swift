@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "PomodoroAuto",
+    defaultLocalization: "en",
     platforms: [.macOS(.v12)],
     products: [
         .executable(name: "PomodoroAuto", targets: ["PomodoroAuto"])

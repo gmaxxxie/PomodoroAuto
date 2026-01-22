@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var state: SessionState = .idle
 
     override init() {
+        Localization.apply(preference: settings.languagePreference)
         self.ruleEngine = RuleEngine(config: settings.ruleConfig)
         self.workTimer = PomodoroTimer(durationSeconds: settings.workMinutes * 60)
         self.breakTimer = PomodoroTimer(durationSeconds: settings.breakMinutes * 60)
@@ -67,7 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         breakTimer.onTick = { [weak self] remaining in
             guard let self else { return }
-            self.menuBar.setRemaining(seconds: remaining, label: "Break", isBreak: true)
+            self.menuBar.setRemaining(seconds: remaining, label: Localization.localized("menu.status.break"), isBreak: true)
         }
 
         breakTimer.onComplete = { [weak self] in
@@ -217,22 +218,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             menuBar.setTotalDuration(seconds: settings.workMinutes * 60)
             menuBar.setRemaining(seconds: workTimer.remainingSeconds, isBreak: false)
         case .paused:
-            menuBar.setStatus(text: "Paused")
+            menuBar.setStatus(text: Localization.localized("menu.status.paused"), mode: .paused)
         case .completed:
-            menuBar.setStatus(text: "Done")
+            menuBar.setStatus(text: Localization.localized("menu.status.done"), mode: .idle)
         case .idle:
-            menuBar.setStatus(text: "Idle")
+            menuBar.setStatus(text: Localization.localized("menu.status.idle"), mode: .idle)
         case .resting:
             menuBar.setTotalDuration(seconds: settings.breakMinutes * 60)
-            menuBar.setRemaining(seconds: breakTimer.remainingSeconds, label: "Break", isBreak: true)
+            menuBar.setRemaining(seconds: breakTimer.remainingSeconds, label: Localization.localized("menu.status.break"), isBreak: true)
         }
     }
 
     private func sendCompletionNotification() {
         guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Pomodoro Complete"
-        content.body = "Time for a break."
+        content.title = Localization.localized("notification.pomodoroComplete.title")
+        content.body = Localization.localized("notification.pomodoroComplete.body")
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
@@ -244,8 +245,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func sendBreakStartedNotification() {
         guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Break Started"
-        content.body = "Relax for a bit."
+        content.title = Localization.localized("notification.breakStarted.title")
+        content.body = Localization.localized("notification.breakStarted.body")
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
@@ -257,8 +258,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func sendBreakEndedNotification() {
         guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Break Over"
-        content.body = "Ready to start the next session."
+        content.title = Localization.localized("notification.breakEnded.title")
+        content.body = Localization.localized("notification.breakEnded.body")
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
@@ -270,8 +271,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func sendWorkStartedNotification() {
         guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Pomodoro Started"
-        content.body = "Focus time begins."
+        content.title = Localization.localized("notification.pomodoroStarted.title")
+        content.body = Localization.localized("notification.pomodoroStarted.body")
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
@@ -339,7 +340,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ruleEngine = RuleEngine(config: settings.ruleConfig)
         workTimer.setDuration(seconds: settings.workMinutes * 60)
         breakTimer.setDuration(seconds: settings.breakMinutes * 60)
+        applyLocalization()
         updateStatusTextForCurrentState()
+    }
+
+    private func applyLocalization() {
+        Localization.apply(preference: settings.languagePreference)
+        menuBar.refreshLocalizedStrings()
+        settingsWindow?.close()
+        settingsWindow = nil
+        statsWindow?.applyLocalization()
     }
 
     private func startBreak() {

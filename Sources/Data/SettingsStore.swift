@@ -8,6 +8,7 @@ final class SettingsStore {
         static let fullscreenNonWork = "fullscreenNonWork"
         static let whitelistBundleIds = "whitelistBundleIds"
         static let autoStartBundleIds = "autoStartBundleIds"
+        static let languagePreference = "languagePreference"
     }
 
     private let defaults: UserDefaults
@@ -20,7 +21,8 @@ final class SettingsStore {
             Keys.autoStart: true,
             Keys.fullscreenNonWork: true,
             Keys.whitelistBundleIds: [],
-            Keys.autoStartBundleIds: []
+            Keys.autoStartBundleIds: [],
+            Keys.languagePreference: LanguagePreference.system.rawValue
         ])
     }
 
@@ -54,6 +56,14 @@ final class SettingsStore {
         set { defaults.set(newValue, forKey: Keys.autoStartBundleIds) }
     }
 
+    var languagePreference: LanguagePreference {
+        get {
+            let raw = defaults.string(forKey: Keys.languagePreference) ?? LanguagePreference.system.rawValue
+            return LanguagePreference(rawValue: raw) ?? .system
+        }
+        set { defaults.set(newValue.rawValue, forKey: Keys.languagePreference) }
+    }
+
     var ruleConfig: RuleConfig {
         RuleConfig(
             fullscreenNonWork: fullscreenNonWork,
@@ -69,5 +79,6 @@ final class SettingsStore {
         defaults.removeObject(forKey: Keys.fullscreenNonWork)
         defaults.removeObject(forKey: Keys.whitelistBundleIds)
         defaults.removeObject(forKey: Keys.autoStartBundleIds)
+        defaults.removeObject(forKey: Keys.languagePreference)
     }
 }
