@@ -30,6 +30,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var totalDuration: Int = 25 * 60
     private var progressLayer: CAShapeLayer?
     private var backgroundLayer: CAShapeLayer?
+    private var menuBarIcon: NSImage?
 
     init(
         onToggle: (() -> Void)? = nil,
@@ -48,10 +49,30 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.menu = NSMenu()
         super.init()
+        loadMenuBarIcon()
         buildMenu()
         configureStatusItem()
         setupProgressRing()
         menu.delegate = self
+    }
+
+    private func loadMenuBarIcon() {
+        // Try Bundle.module first (Swift Package resources)
+        if let url = Bundle.module.url(forResource: "menubar-icon-template", withExtension: "pdf") {
+            if let image = NSImage(contentsOf: url) {
+                image.isTemplate = true
+                image.size = NSSize(width: 18, height: 18)
+                menuBarIcon = image
+                return
+            }
+        }
+        
+        // Fallback to named image
+        if let image = NSImage(named: "menubar-icon-template") {
+            image.isTemplate = true
+            image.size = NSSize(width: 18, height: 18)
+            menuBarIcon = image
+        }
     }
 
     // MARK: - NSMenuDelegate
@@ -111,28 +132,32 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func updateStatusIcon(isRunning: Bool) {
         guard let button = statusItem.button else { return }
-        let symbolName: String
-        let tintColor: NSColor
 
+        if let icon = menuBarIcon {
+            button.image = icon
+            button.imagePosition = .imageLeading
+            return
+        }
+
+        let symbolName: String
         switch currentMode {
         case .work:
             symbolName = "timer.circle.fill"
-            tintColor = NSColor.systemGreen
         case .rest:
             symbolName = "cup.and.saucer.fill"
-            tintColor = NSColor.systemBlue
         case .paused:
             symbolName = "pause.circle.fill"
-            tintColor = NSColor.systemOrange
         case .idle:
             symbolName = "timer.circle"
-            tintColor = NSColor.secondaryLabelColor
         }
 
-        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Pomodoro") {
-            image.isTemplate = false
-            button.contentTintColor = tintColor
-            button.image = image
+        if let icon = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Pomodoro") {
+            icon.isTemplate = true
+            button.image = icon
+            button.imagePosition = .imageLeading
+        } else {
+            button.image = nil
+            button.title = "🍅"
         }
     }
 
@@ -141,7 +166,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         button.wantsLayer = true
 
         let size: CGFloat = 18
-        let lineWidth: CGFloat = 2.5
+        let lineWidth: CGFloat = 2.0
         let center = CGPoint(x: size / 2, y: size / 2)
         let radius = (size - lineWidth) / 2
 
@@ -153,7 +178,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let bgLayer = CAShapeLayer()
         bgLayer.path = circlePath
         bgLayer.fillColor = nil
-        bgLayer.strokeColor = NSColor.tertiaryLabelColor.cgColor
+        bgLayer.strokeColor = NSColor.tertiaryLabelColor.withAlphaComponent(0.3).cgColor
         bgLayer.lineWidth = lineWidth
         bgLayer.frame = CGRect(x: 0, y: 0, width: size, height: size)
         bgLayer.isHidden = true
@@ -175,9 +200,31 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         
         button.layer?.addSublayer(bgLayer)
         button.layer?.addSublayer(progLayer)
+        
+        updateProgressRingPosition()
+    }
+    
+    private func updateProgressRingPosition() {
+        guard let button = statusItem.button,
+              let bgLayer = backgroundLayer,
+              let progLayer = progressLayer else { return }
+        
+        let buttonBounds = button.bounds
+        let ringSize: CGFloat = 18
+        let iconInset: CGFloat = 4
+        let xOffset = iconInset + (ringSize / 2) - (ringSize / 2)
+        let yOffset = (buttonBounds.height - ringSize) / 2
+        
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        bgLayer.frame.origin = CGPoint(x: xOffset, y: yOffset)
+        progLayer.frame.origin = CGPoint(x: xOffset, y: yOffset)
+        CATransaction.commit()
     }
 
     private func updateProgressRing(remaining: Int) {
+        updateProgressRingPosition()
+        
         let progress: CGFloat
         if remaining > 0 && totalDuration > 0 {
             progress = CGFloat(remaining) / CGFloat(totalDuration)

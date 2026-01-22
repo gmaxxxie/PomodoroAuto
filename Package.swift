@@ -10,7 +10,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "PomodoroAuto",
-            path: "Sources"
+            path: "Sources",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "PomodoroAutoTests",

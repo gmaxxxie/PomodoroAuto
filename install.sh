@@ -28,6 +28,7 @@ APP_PATH="$SCRIPT_DIR/PomodoroAuto.app"
 APP_CONTENTS="$APP_PATH/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
+APP_ICON="$SCRIPT_DIR/Assets/Icons/AppIcon.icns"
 
 echo "📁 Creating app bundle..."
 rm -rf "$APP_PATH"
@@ -36,6 +37,14 @@ mkdir -p "$APP_RESOURCES"
 
 # Copy executable
 cp "$BUILD_DIR/PomodoroAuto" "$APP_MACOS/"
+
+# Copy app icon
+if [[ ! -f "$APP_ICON" ]]; then
+    echo "❌ Error: App icon not found at $APP_ICON"
+    echo "   Generate the icon at Assets/Icons/AppIcon.icns before installing."
+    exit 1
+fi
+cp "$APP_ICON" "$APP_RESOURCES/AppIcon.icns"
 
 # Create Info.plist
 cat > "$APP_CONTENTS/Info.plist" << 'EOF'
@@ -51,6 +60,8 @@ cat > "$APP_CONTENTS/Info.plist" << 'EOF'
     <string>PomodoroAuto</string>
     <key>CFBundleDisplayName</key>
     <string>PomodoroAuto</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

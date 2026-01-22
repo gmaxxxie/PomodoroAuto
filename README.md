@@ -41,6 +41,8 @@ cat > ~/Desktop/PomodoroAuto.app/Contents/Info.plist << 'EOF'
     <string>com.pomodoroauto.app</string>
     <key>CFBundleName</key>
     <string>PomodoroAuto</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -56,6 +58,9 @@ cat > ~/Desktop/PomodoroAuto.app/Contents/Info.plist << 'EOF'
 </dict>
 </plist>
 EOF
+
+# 复制应用图标
+cp ./Assets/Icons/AppIcon.icns ~/Desktop/PomodoroAuto.app/Contents/Resources/AppIcon.icns
 
 # 移动到 Applications 文件夹
 mv ~/Desktop/PomodoroAuto.app /Applications/

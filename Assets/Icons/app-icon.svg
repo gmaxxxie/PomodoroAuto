@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <mask id="tomatoMask">
+      <rect width="100%" height="100%" fill="black"/>
+      <path d="M512 160c-214 0-388 166-388 370 0 204 174 370 388 370s388-166 388-370c0-204-174-370-388-370z" fill="white"/>
+      <circle cx="512" cy="600" r="190" fill="none" stroke="black" stroke-width="70" stroke-linecap="round" stroke-dasharray="900 293" stroke-dashoffset="-120"/>
+    </mask>
+  </defs>
+  <rect width="100%" height="100%" fill="none"/>
+  <g mask="url(#tomatoMask)">
+    <path d="M512 160c-214 0-388 166-388 370 0 204 174 370 388 370s388-166 388-370c0-204-174-370-388-370z" fill="#C7655C"/>
+  </g>
+  <path d="M454 164c8-36 32-64 58-64 26 0 50 28 58 64 24-10 48-12 72-6-20 44-52 70-96 80-44-10-76-36-96-80 24-6 48-4 72 6z" fill="#6E7B6A"/>
+</svg>
