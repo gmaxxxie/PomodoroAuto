@@ -138,9 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let runningBundleIds = detector.runningBundleIds()
         let allowlist = Set(settings.autoStartBundleIds)
         let runningAllowlistApps = allowlist.intersection(runningBundleIds)
-        let isAllowlistAppRunning = !runningAllowlistApps.isEmpty
-        let focusedAppIsWork = ruleEngine.isWork(snapshot: snapshot)
-        let isWork = isAllowlistAppRunning && focusedAppIsWork
+        let isWork = ruleEngine.isWork(snapshot: snapshot, runningAllowlistApps: runningBundleIds)
         
         Self.logger.debug("App: \(snapshot.bundleId), isWork: \(isWork), running allowlist apps: \(runningAllowlistApps)")
         if isWork {

@@ -2,6 +2,12 @@ import AppKit
 import QuartzCore
 
 final class MenuBarController: NSObject, NSMenuDelegate {
+    private enum Layout {
+        static let iconSize: CGFloat = 19
+        static let ringLineWidth: CGFloat = 2
+        static let iconInset: CGFloat = 3
+    }
+
     enum TimerMode {
         case idle
         case work
@@ -35,6 +41,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var totalDuration: Int = 25 * 60
     private var progressLayer: CAShapeLayer?
     private var backgroundLayer: CAShapeLayer?
+    private lazy var menuBarIcon: NSImage? = {
+        guard let url = Bundle.module.url(forResource: "menubar-icon-template", withExtension: "pdf"),
+              let image = NSImage(contentsOf: url) else {
+            return nil
+        }
+        image.isTemplate = true
+        image.size = NSSize(width: Layout.iconSize, height: Layout.iconSize)
+        return image
+    }()
 
     init(
         onToggle: (() -> Void)? = nil,
@@ -115,29 +130,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func updateStatusIcon(isRunning: Bool) {
         guard let button = statusItem.button else { return }
 
-        let symbolName: String
-        switch currentMode {
-        case .work:
-            symbolName = "timer.circle.fill"
-        case .rest:
-            symbolName = "cup.and.saucer.fill"
-        case .paused:
-            symbolName = "pause.circle"
-        case .idle:
-            symbolName = "timer.circle"
-        }
-
-        if let icon = NSImage(systemSymbolName: symbolName, accessibilityDescription: Localization.localized("menu.accessibility.pomodoro")) {
-            icon.isTemplate = true
-            icon.size = NSSize(width: 18, height: 18)
+        if let icon = menuBarIcon {
             button.image = icon
             button.imagePosition = .imageLeading
-            if #available(macOS 10.14, *) {
-                button.contentTintColor = .labelColor
-            }
+        } else if let icon = NSImage(systemSymbolName: "timer.circle", accessibilityDescription: Localization.localized("menu.accessibility.pomodoro")) {
+            icon.isTemplate = true
+            icon.size = NSSize(width: Layout.iconSize, height: Layout.iconSize)
+            button.image = icon
+            button.imagePosition = .imageLeading
         } else {
             button.image = nil
             button.title = "🍅"
+        }
+
+        if #available(macOS 10.14, *) {
+            button.contentTintColor = .labelColor
         }
     }
 
@@ -145,8 +152,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let button = statusItem.button else { return }
         button.wantsLayer = true
 
-        let size: CGFloat = 18
-        let lineWidth: CGFloat = 2.0
+        let size: CGFloat = Layout.iconSize
+        let lineWidth: CGFloat = Layout.ringLineWidth
         let center = CGPoint(x: size / 2, y: size / 2)
         let radius = (size - lineWidth) / 2
 
@@ -190,9 +197,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
               let progLayer = progressLayer else { return }
         
         let buttonBounds = button.bounds
-        let ringSize: CGFloat = 18
-        let iconInset: CGFloat = 4
-        let xOffset = iconInset + (ringSize / 2) - (ringSize / 2)
+        let ringSize: CGFloat = Layout.iconSize
+        let xOffset = Layout.iconInset
         let yOffset = (buttonBounds.height - ringSize) / 2
         
         CATransaction.begin()

@@ -21,4 +21,11 @@ struct RuleEngine {
         }
         return true
     }
+
+    func isWork(snapshot: FocusSnapshot, runningAllowlistApps: Set<String>) -> Bool {
+        if !config.autoStartBundleIds.isEmpty {
+            return !config.autoStartBundleIds.intersection(runningAllowlistApps).isEmpty
+        }
+        return isWork(snapshot: snapshot)
+    }
 }

@@ -66,7 +66,7 @@ icon:
 		print("✅ Wrote", output)
 		PY
 	fi
-	@rsvg-convert "$(MENUBAR_SVG)" -f pdf -o "$(ASSETS_DIR)/menubar-icon-template.pdf"
-	@rsvg-convert "$(MENUBAR_SVG)" -w 18 -h 18 -o "$(ASSETS_DIR)/menubar-icon-template@1x.png"
-	@rsvg-convert "$(MENUBAR_SVG)" -w 36 -h 36 -o "$(ASSETS_DIR)/menubar-icon-template@2x.png"
+	@rsvg-convert "$(MENUBAR_SVG)" -f pdf -d 72 -p 72 -w 19 -h 19 --page-width 19 --page-height 19 -o "$(ASSETS_DIR)/menubar-icon-template.pdf"
+	@rsvg-convert "$(MENUBAR_SVG)" -w 19 -h 19 -o "$(ASSETS_DIR)/menubar-icon-template@1x.png"
+	@rsvg-convert "$(MENUBAR_SVG)" -w 38 -h 38 -o "$(ASSETS_DIR)/menubar-icon-template@2x.png"
 	@echo "✅ Icons generated in $(ASSETS_DIR)"

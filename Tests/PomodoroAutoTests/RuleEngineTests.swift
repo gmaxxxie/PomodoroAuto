@@ -25,6 +25,40 @@ final class RuleEngineTests: XCTestCase {
         XCTAssertFalse(engine.isWork(snapshot: blocked))
     }
 
+    func testAutoStartAllowlistRunsWhenAllowedAppIsRunning() {
+        let config = RuleConfig(
+            fullscreenNonWork: true,
+            whitelistBundleIds: [],
+            autoStartBundleIds: ["com.example.Work"]
+        )
+        let engine = RuleEngine(config: config)
+        let snapshot = FocusSnapshot(
+            appName: "Other",
+            bundleId: "com.example.Other",
+            isFullscreen: true,
+            timestamp: Date()
+        )
+        let running = Set(["com.example.Work"])
+        XCTAssertTrue(engine.isWork(snapshot: snapshot, runningAllowlistApps: running))
+    }
+
+    func testAutoStartAllowlistStopsWhenNoAllowedAppIsRunning() {
+        let config = RuleConfig(
+            fullscreenNonWork: true,
+            whitelistBundleIds: [],
+            autoStartBundleIds: ["com.example.Work"]
+        )
+        let engine = RuleEngine(config: config)
+        let snapshot = FocusSnapshot(
+            appName: "Other",
+            bundleId: "com.example.Other",
+            isFullscreen: false,
+            timestamp: Date()
+        )
+        let running = Set(["com.example.Other"])
+        XCTAssertFalse(engine.isWork(snapshot: snapshot, runningAllowlistApps: running))
+    }
+
     func testSafariFullscreenAlwaysNonWork() {
         let config = RuleConfig(
             fullscreenNonWork: false,

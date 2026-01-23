@@ -7,3 +7,4 @@ PomodoroAuto.app/
 *.xcworkspace/
 xcuserdata/
 DerivedData/
+debug/

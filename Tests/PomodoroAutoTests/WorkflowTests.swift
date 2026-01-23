@@ -27,8 +27,8 @@ final class WorkflowTests: XCTestCase {
         super.tearDown()
     }
     
-    private func simulatePoll(engine: RuleEngine, snapshot: FocusSnapshot) {
-        let isWork = engine.isWork(snapshot: snapshot)
+    private func simulatePoll(engine: RuleEngine, snapshot: FocusSnapshot, runningAllowlistApps: Set<String>) {
+        let isWork = engine.isWork(snapshot: snapshot, runningAllowlistApps: runningAllowlistApps)
         if isWork {
             if !workTimer.isRunning && !breakTimer.isRunning {
                 workTimer.start()
@@ -51,7 +51,7 @@ final class WorkflowTests: XCTestCase {
             isFullscreen: false,
             timestamp: Date()
         )
-        simulatePoll(engine: engine, snapshot: workSnapshot)
+        simulatePoll(engine: engine, snapshot: workSnapshot, runningAllowlistApps: ["com.work.app"])
         XCTAssertTrue(workTimer.isRunning, "Timer should auto-start for allowed app")
         
         let distractionSnapshot = FocusSnapshot(
@@ -60,11 +60,11 @@ final class WorkflowTests: XCTestCase {
             isFullscreen: false,
             timestamp: Date()
         )
-        simulatePoll(engine: engine, snapshot: distractionSnapshot)
-        XCTAssertFalse(workTimer.isRunning, "Timer should pause for non-allowed app")
+        simulatePoll(engine: engine, snapshot: distractionSnapshot, runningAllowlistApps: ["com.work.app"])
+        XCTAssertTrue(workTimer.isRunning, "Timer should keep running while allowed app is running")
         
-        simulatePoll(engine: engine, snapshot: workSnapshot)
-        XCTAssertTrue(workTimer.isRunning, "Timer should resume when back to work")
+        simulatePoll(engine: engine, snapshot: distractionSnapshot, runningAllowlistApps: [])
+        XCTAssertFalse(workTimer.isRunning, "Timer should pause when no allowed app is running")
     }
     
     func testFullscreenRuleFlow() {
@@ -76,7 +76,7 @@ final class WorkflowTests: XCTestCase {
             isFullscreen: true,
             timestamp: Date()
         )
-        simulatePoll(engine: engine, snapshot: workFullscreen)
+        simulatePoll(engine: engine, snapshot: workFullscreen, runningAllowlistApps: ["com.work.app"])
         XCTAssertTrue(workTimer.isRunning, "Whitelisted app in fullscreen should count as work")
         
         let randomFullscreen = FocusSnapshot(
@@ -85,8 +85,8 @@ final class WorkflowTests: XCTestCase {
             isFullscreen: true,
             timestamp: Date()
         )
-        simulatePoll(engine: engine, snapshot: randomFullscreen)
-        XCTAssertFalse(workTimer.isRunning, "Non-whitelisted app in fullscreen should pause")
+        simulatePoll(engine: engine, snapshot: randomFullscreen, runningAllowlistApps: ["com.work.app"])
+        XCTAssertTrue(workTimer.isRunning, "Allowlist running should keep timer active even in fullscreen")
     }
     
     func testTimerCompletionFlow() {
