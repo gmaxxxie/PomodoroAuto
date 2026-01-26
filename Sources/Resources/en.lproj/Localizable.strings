@@ -79,3 +79,16 @@
 "stats.reset.alert.body" = "This will permanently delete all your pomodoro statistics. This action cannot be undone.";
 "stats.reset.alert.reset" = "Reset";
 "stats.reset.alert.cancel" = "Cancel";
+
+"overlay.break.title" = "Time to take a break";
+"overlay.break.dismiss" = "Press Esc to dismiss";
+"overlay.break.prompt.1" = "Stand up, stretch your shoulders, and relax your jaw.";
+"overlay.break.prompt.2" = "Look 20 feet away for 20 seconds to rest your eyes.";
+"overlay.break.prompt.3" = "Take five slow breaths in and out, counting each one.";
+"overlay.break.prompt.4" = "Get a glass of water and take a few sips.";
+"overlay.break.prompt.5" = "Roll your neck gently left and right to release tension.";
+"overlay.break.prompt.6" = "Walk around for a minute to reset your focus.";
+"overlay.break.prompt.7" = "Open a window and take a few deep breaths.";
+"overlay.break.prompt.8" = "Shake out your hands and loosen your wrists.";
+"overlay.break.prompt.9" = "Close your eyes for a moment and relax your forehead.";
+"overlay.break.prompt.10" = "Sit back and let your shoulders drop for a few seconds.";
