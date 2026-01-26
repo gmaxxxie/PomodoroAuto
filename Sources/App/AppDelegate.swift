@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let workTimer: PomodoroTimer
     private let breakTimer: PomodoroTimer
     private let menuBar: MenuBarController
+    private let breakPromptProvider = BreakPromptProvider()
     
     private var settingsWindow: SettingsWindowController?
     private var statsWindow: StatsWindowController?
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var activeSessionStart: Date?
     private var accumulatedWorkSeconds = 0
     private var state: SessionState = .idle
+    private var breakOverlayWindowController: BreakOverlayWindowController?
 
     override init() {
         Localization.apply(preference: settings.languagePreference)
@@ -355,6 +357,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         state = .resting
         updateStatusTextForCurrentState()
         sendBreakStartedNotification()
+        showBreakOverlay()
+    }
+
+    private func showBreakOverlay() {
+        let title = Localization.localized("overlay.break.title")
+        let message = breakPromptProvider.randomPrompt()
+        let footer = Localization.localized("overlay.break.dismiss")
+        let controller = BreakOverlayWindowController(timeoutSeconds: 15) { [weak self] in
+            self?.breakOverlayWindowController = nil
+        }
+        breakOverlayWindowController?.dismiss()
+        breakOverlayWindowController = controller
+        controller.show(title: title, message: message, footer: footer)
     }
 
     private func positionWindowTopRight(_ window: NSWindow) {
