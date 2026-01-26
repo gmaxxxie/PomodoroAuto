@@ -8,3 +8,4 @@ PomodoroAuto.app/
 xcuserdata/
 DerivedData/
 debug/
+.worktrees/
