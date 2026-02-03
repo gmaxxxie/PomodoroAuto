@@ -79,3 +79,24 @@
 "stats.reset.alert.body" = "This will permanently delete all your pomodoro statistics. This action cannot be undone.";
 "stats.reset.alert.reset" = "Reset";
 "stats.reset.alert.cancel" = "Cancel";
+
+"overlay.break.title" = "Break Time";
+"overlay.break.dismiss" = "Press ESC to dismiss";
+"overlay.break.prompt.1" = "Stand up and stretch your body";
+"overlay.break.prompt.2" = "Have a glass of water";
+"overlay.break.prompt.3" = "Look away from the screen";
+"overlay.break.prompt.4" = "Take a few deep breaths";
+"overlay.break.prompt.5" = "Relax your shoulders";
+"overlay.break.prompt.6" = "Close your eyes for a moment";
+"overlay.break.prompt.7" = "Walk around the room";
+"overlay.break.prompt.8" = "Rest your wrists";
+"overlay.break.prompt.9" = "Look out the window";
+"overlay.break.prompt.10" = "Clear your mind";
+
+"overlay.continuation.title" = "Break Complete";
+"overlay.continuation.message" = "Ready to start the next pomodoro?";
+"overlay.continuation.startNext" = "Start Next";
+"overlay.continuation.stop" = "Stop";
+
+"notification.action.startNext" = "Start Next";
+"notification.action.stop" = "Stop";

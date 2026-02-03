@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     
     private var settingsWindow: SettingsWindowController?
     private var statsWindow: StatsWindowController?
+    private var breakOverlay: BreakOverlayWindowController?
+    private var continuationPrompt: ContinuationPromptWindowController?
     private var focusTimer: DispatchSourceTimer?
     private var activeSessionStart: Date?
     private var accumulatedWorkSeconds = 0
@@ -69,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         breakTimer.onTick = { [weak self] remaining in
             guard let self else { return }
             self.menuBar.setRemaining(seconds: remaining, label: Localization.localized("menu.status.break"), isBreak: true)
+            self.breakOverlay?.updateCountdown(seconds: remaining)
         }
 
         breakTimer.onComplete = { [weak self] in
@@ -76,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             self.state = .paused
             self.updateStatusTextForCurrentState()
             self.sendBreakEndedNotification()
+            self.showContinuationPrompt()
         }
     }
 
@@ -104,6 +108,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
+        
+        let startNextAction = UNNotificationAction(
+            identifier: "START_NEXT",
+            title: Localization.localized("notification.action.startNext"),
+            options: [.foreground]
+        )
+        let stopAction = UNNotificationAction(
+            identifier: "STOP",
+            title: Localization.localized("notification.action.stop"),
+            options: []
+        )
+        
+        let breakEndedCategory = UNNotificationCategory(
+            identifier: "BREAK_ENDED",
+            actions: [startNextAction, stopAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        
+        center.setNotificationCategories([breakEndedCategory])
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
@@ -232,6 +256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let content = UNMutableNotificationContent()
         content.title = Localization.localized("notification.pomodoroComplete.title")
         content.body = Localization.localized("notification.pomodoroComplete.body")
+        content.sound = .default
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
@@ -245,6 +270,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let content = UNMutableNotificationContent()
         content.title = Localization.localized("notification.breakStarted.title")
         content.body = Localization.localized("notification.breakStarted.body")
+        content.sound = .default
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
@@ -258,6 +284,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let content = UNMutableNotificationContent()
         content.title = Localization.localized("notification.breakEnded.title")
         content.body = Localization.localized("notification.breakEnded.body")
+        content.sound = .default
+        content.categoryIdentifier = "BREAK_ENDED"
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
@@ -271,6 +299,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let content = UNMutableNotificationContent()
         content.title = Localization.localized("notification.pomodoroStarted.title")
         content.body = Localization.localized("notification.pomodoroStarted.body")
+        content.sound = .default
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
@@ -285,6 +314,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        switch response.actionIdentifier {
+        case "START_NEXT":
+            DispatchQueue.main.async { [weak self] in
+                self?.startTimer()
+            }
+        case "STOP":
+            DispatchQueue.main.async { [weak self] in
+                self?.resetTimer()
+            }
+        default:
+            break
+        }
+        completionHandler()
     }
 
     private func openSettings() {
@@ -351,10 +400,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func startBreak() {
+        breakTimer.reset()
         breakTimer.start()
         state = .resting
         updateStatusTextForCurrentState()
         sendBreakStartedNotification()
+        showBreakOverlay()
+    }
+
+    private func showBreakOverlay() {
+        guard NSScreen.main != nil else { return }
+        let prompt = BreakPromptProvider.randomPrompt()
+        breakOverlay = BreakOverlayWindowController()
+        breakOverlay?.onSkipBreak = { [weak self] in
+            guard let self else { return }
+            self.breakTimer.pause()
+            self.startTimer()
+        }
+        breakOverlay?.updateCountdown(seconds: settings.breakMinutes * 60)
+        breakOverlay?.show(
+            title: Localization.localized("overlay.break.title"),
+            message: prompt,
+            footer: Localization.localized("overlay.break.dismiss"),
+            timeoutSeconds: 30
+        )
+    }
+
+    private func showContinuationPrompt() {
+        guard NSScreen.main != nil else { return }
+        breakOverlay?.dismiss()
+        breakOverlay = nil
+        
+        continuationPrompt = ContinuationPromptWindowController()
+        continuationPrompt?.onStartNext = { [weak self] in
+            guard let self else { return }
+            self.continuationPrompt = nil
+            self.startTimer()
+        }
+        continuationPrompt?.onStop = { [weak self] in
+            guard let self else { return }
+            self.continuationPrompt = nil
+            self.resetTimer()
+        }
+        continuationPrompt?.show(
+            title: Localization.localized("overlay.continuation.title"),
+            message: Localization.localized("overlay.continuation.message"),
+            startNextTitle: Localization.localized("overlay.continuation.startNext"),
+            stopTitle: Localization.localized("overlay.continuation.stop")
+        )
     }
 
     private func positionWindowTopRight(_ window: NSWindow) {

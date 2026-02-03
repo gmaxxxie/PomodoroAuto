@@ -79,3 +79,24 @@
 "stats.reset.alert.body" = "这将永久删除所有番茄钟统计数据，无法撤销。";
 "stats.reset.alert.reset" = "重置";
 "stats.reset.alert.cancel" = "取消";
+
+"overlay.break.title" = "休息时间";
+"overlay.break.dismiss" = "按 ESC 关闭";
+"overlay.break.prompt.1" = "站起来活动一下身体";
+"overlay.break.prompt.2" = "喝杯水补充水分";
+"overlay.break.prompt.3" = "眺望远方放松眼睛";
+"overlay.break.prompt.4" = "做几次深呼吸";
+"overlay.break.prompt.5" = "放松肩膀和颈部";
+"overlay.break.prompt.6" = "闭眼休息片刻";
+"overlay.break.prompt.7" = "在房间里走动一下";
+"overlay.break.prompt.8" = "让手腕休息一会儿";
+"overlay.break.prompt.9" = "看看窗外的风景";
+"overlay.break.prompt.10" = "清空思绪放松大脑";
+
+"overlay.continuation.title" = "休息结束";
+"overlay.continuation.message" = "准备开始下一个番茄钟？";
+"overlay.continuation.startNext" = "继续下一个";
+"overlay.continuation.stop" = "停止";
+
+"notification.action.startNext" = "继续下一个";
+"notification.action.stop" = "停止";

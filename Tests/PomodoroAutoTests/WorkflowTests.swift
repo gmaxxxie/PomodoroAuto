@@ -103,4 +103,24 @@ final class WorkflowTests: XCTestCase {
         XCTAssertFalse(workTimer.isRunning)
         XCTAssertEqual(workTimer.remainingSeconds, 1, "Timer should reset to duration after completion")
     }
+    
+    func testBreakStartsAfterWorkCompletion() {
+        let workCompletionExpectation = expectation(description: "Work timer should complete")
+        
+        workTimer.onComplete = { [weak self] in
+            guard let self else { return }
+            self.breakTimer.reset()
+            self.breakTimer.start()
+            workCompletionExpectation.fulfill()
+        }
+        
+        workTimer.setDuration(seconds: 1)
+        workTimer.start()
+        
+        wait(for: [workCompletionExpectation], timeout: 2.0)
+        
+        XCTAssertFalse(workTimer.isRunning, "Work timer should not be running after completion")
+        XCTAssertTrue(breakTimer.isRunning, "Break timer should start after work completion")
+        XCTAssertEqual(breakTimer.remainingSeconds, 5, "Break timer should have full duration")
+    }
 }

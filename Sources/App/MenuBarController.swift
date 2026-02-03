@@ -196,9 +196,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
               let bgLayer = backgroundLayer,
               let progLayer = progressLayer else { return }
         
+        button.layoutSubtreeIfNeeded()
+        
         let buttonBounds = button.bounds
         let ringSize: CGFloat = Layout.iconSize
-        let xOffset = Layout.iconInset
+        
+        var xOffset: CGFloat = Layout.iconInset
+        if let cell = button.cell as? NSButtonCell {
+            let imageRect = cell.imageRect(forBounds: buttonBounds)
+            if imageRect.width > 0 && imageRect.origin.x >= 0 {
+                xOffset = imageRect.origin.x + (imageRect.width - ringSize) / 2
+            }
+        }
         let yOffset = (buttonBounds.height - ringSize) / 2
         
         CATransaction.begin()
