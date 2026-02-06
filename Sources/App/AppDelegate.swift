@@ -49,7 +49,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureNotifications()
-        _ = detector.requestAccess()
+        if Self.shouldPromptAccessibilityAccess(
+            autoStartEnabled: settings.autoStart,
+            isAccessibilityTrusted: detector.isAccessibilityTrusted
+        ) {
+            _ = detector.requestAccess()
+        }
         startFocusDetection()
         updateStatusTextForCurrentState()
     }
@@ -155,14 +160,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
 
-        if snapshot.bundleId == Bundle.main.bundleIdentifier {
+        let runningBundleIds = detector.runningBundleIds()
+        let allowlistBundleIds = settings.autoStartBundleIds
+        let runningAllowlistApps = Set(allowlistBundleIds).intersection(runningBundleIds)
+        guard let isWork = Self.evaluateWorkState(
+            snapshot: snapshot,
+            appBundleId: Bundle.main.bundleIdentifier,
+            runningBundleIds: runningBundleIds,
+            autoStartBundleIds: allowlistBundleIds,
+            ruleEngine: ruleEngine
+        ) else {
             return
         }
-
-        let runningBundleIds = detector.runningBundleIds()
-        let allowlist = Set(settings.autoStartBundleIds)
-        let runningAllowlistApps = allowlist.intersection(runningBundleIds)
-        let isWork = ruleEngine.isWork(snapshot: snapshot, runningAllowlistApps: runningBundleIds)
         
         Self.logger.debug("App: \(snapshot.bundleId), isWork: \(isWork), running allowlist apps: \(runningAllowlistApps)")
         if isWork {
@@ -174,6 +183,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 pauseTimer()
             }
         }
+    }
+
+    static func shouldPromptAccessibilityAccess(
+        autoStartEnabled: Bool,
+        isAccessibilityTrusted: Bool
+    ) -> Bool {
+        autoStartEnabled && !isAccessibilityTrusted
+    }
+
+    static func evaluateWorkState(
+        snapshot: FocusSnapshot,
+        appBundleId: String?,
+        runningBundleIds: Set<String>,
+        autoStartBundleIds: [String],
+        ruleEngine: RuleEngine
+    ) -> Bool? {
+        let runningAllowlistApps = Set(autoStartBundleIds).intersection(runningBundleIds)
+        if snapshot.bundleId == appBundleId && runningAllowlistApps.isEmpty {
+            return nil
+        }
+        return ruleEngine.isWork(snapshot: snapshot, runningAllowlistApps: runningAllowlistApps)
     }
 
     private func toggleRunning() {
