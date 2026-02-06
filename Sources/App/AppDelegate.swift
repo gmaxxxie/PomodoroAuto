@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var focusTimer: DispatchSourceTimer?
     private var activeSessionStart: Date?
     private var accumulatedWorkSeconds = 0
+    private var isAutoStartSuppressed = false
     private var state: SessionState = .idle
 
     override init() {
@@ -162,7 +163,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         let runningBundleIds = detector.runningBundleIds()
         let allowlistBundleIds = settings.autoStartBundleIds
-        let runningAllowlistApps = Set(allowlistBundleIds).intersection(runningBundleIds)
         guard let isWork = Self.evaluateWorkState(
             snapshot: snapshot,
             appBundleId: Bundle.main.bundleIdentifier,
@@ -172,16 +172,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ) else {
             return
         }
+        isAutoStartSuppressed = Self.nextAutoStartSuppressionState(
+            currentlySuppressed: isAutoStartSuppressed,
+            isWork: isWork
+        )
         
-        Self.logger.debug("App: \(snapshot.bundleId), isWork: \(isWork), running allowlist apps: \(runningAllowlistApps)")
+        Self.logger.debug("App: \(snapshot.bundleId), isWork: \(isWork), auto-start suppressed: \(self.isAutoStartSuppressed)")
         if isWork {
-            if !workTimer.isRunning && !breakTimer.isRunning {
+            if Self.shouldStartTimer(
+                isWork: isWork,
+                workTimerRunning: workTimer.isRunning,
+                breakTimerRunning: breakTimer.isRunning,
+                isAutoStartSuppressed: isAutoStartSuppressed
+            ) {
                 startTimer()
             }
-        } else {
-            if workTimer.isRunning {
-                pauseTimer()
-            }
+        } else if Self.shouldPauseWorkTimer(
+            isWork: isWork,
+            workTimerRunning: workTimer.isRunning
+        ) {
+            pauseTimer()
         }
     }
 
@@ -204,6 +214,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return nil
         }
         return ruleEngine.isWork(snapshot: snapshot, runningAllowlistApps: runningAllowlistApps)
+    }
+
+    static func shouldStartTimer(
+        isWork: Bool,
+        workTimerRunning: Bool,
+        breakTimerRunning: Bool,
+        isAutoStartSuppressed: Bool
+    ) -> Bool {
+        isWork && !workTimerRunning && !breakTimerRunning && !isAutoStartSuppressed
+    }
+
+    static func nextAutoStartSuppressionState(
+        currentlySuppressed: Bool,
+        isWork: Bool
+    ) -> Bool {
+        guard currentlySuppressed else { return false }
+        return isWork
+    }
+
+    static func shouldPauseWorkTimer(
+        isWork: Bool,
+        workTimerRunning: Bool
+    ) -> Bool {
+        !isWork && workTimerRunning
     }
 
     private func toggleRunning() {
@@ -235,12 +269,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func startTimer() {
+        isAutoStartSuppressed = false
         breakTimer.pause()
         beginActiveSessionIfNeeded()
         workTimer.start()
         state = .running
         updateStatusTextForCurrentState()
         sendWorkStartedNotification()
+    }
+
+    private func stopAndSuppressAutoStart() {
+        isAutoStartSuppressed = true
+        resetTimer()
     }
 
     private func beginActiveSessionIfNeeded() {
@@ -358,7 +398,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         case "STOP":
             DispatchQueue.main.async { [weak self] in
-                self?.resetTimer()
+                self?.stopAndSuppressAutoStart()
             }
         default:
             break
@@ -472,7 +512,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         continuationPrompt?.onStop = { [weak self] in
             guard let self else { return }
             self.continuationPrompt = nil
-            self.resetTimer()
+            self.stopAndSuppressAutoStart()
         }
         continuationPrompt?.onClose = { [weak self] in
             self?.continuationPrompt = nil

@@ -80,4 +80,47 @@ final class AppDelegateAutoStartTests: XCTestCase {
 
         XCTAssertNil(isWork, "When allowlist is empty and PomodoroAuto is frontmost, focus poll should skip")
     }
+
+    func testShouldStartTimerSkipsWhenAutoStartIsSuppressed() {
+        let shouldStart = AppDelegate.shouldStartTimer(
+            isWork: true,
+            workTimerRunning: false,
+            breakTimerRunning: false,
+            isAutoStartSuppressed: true
+        )
+
+        XCTAssertFalse(shouldStart, "Explicit stop should suppress immediate auto-start")
+    }
+
+    func testNextAutoStartSuppressionStateClearsAfterNonWorkSnapshot() {
+        let stillSuppressed = AppDelegate.nextAutoStartSuppressionState(
+            currentlySuppressed: true,
+            isWork: true
+        )
+        XCTAssertTrue(stillSuppressed, "Suppression should remain while work condition stays true")
+
+        let clearedSuppression = AppDelegate.nextAutoStartSuppressionState(
+            currentlySuppressed: true,
+            isWork: false
+        )
+        XCTAssertFalse(clearedSuppression, "Suppression should clear after leaving work context")
+    }
+
+    func testShouldPauseWorkTimerDoesNotPauseWhenIsWork() {
+        let shouldPause = AppDelegate.shouldPauseWorkTimer(
+            isWork: true,
+            workTimerRunning: true
+        )
+
+        XCTAssertFalse(shouldPause, "Work timer should keep running when current snapshot is work")
+    }
+
+    func testShouldPauseWorkTimerPausesWhenNotWorkAndRunning() {
+        let shouldPause = AppDelegate.shouldPauseWorkTimer(
+            isWork: false,
+            workTimerRunning: true
+        )
+
+        XCTAssertTrue(shouldPause, "Work timer should pause only when not-work condition is detected")
+    }
 }
