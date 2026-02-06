@@ -29,6 +29,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private let statusItem: NSStatusItem
     private let menu: NSMenu
+    private let customStatusIconLoader: () -> NSImage?
+    private let systemSymbolLoader: (String, String) -> NSImage?
     private let statusTitleItem = NSMenuItem(title: Localization.localized("menu.status.idle"), action: nil, keyEquivalent: "")
     private let pomodoroStatsItem = NSMenuItem(title: "🍅 0", action: nil, keyEquivalent: "")
     private let workTimeStatsItem = NSMenuItem(title: "⏱ 00:00", action: nil, keyEquivalent: "")
@@ -41,12 +43,48 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var totalDuration: Int = 25 * 60
     private var progressLayer: CAShapeLayer?
     private var backgroundLayer: CAShapeLayer?
-    private lazy var menuBarIcon: NSImage? = {
+    private static func loadBundledStatusIcon() -> NSImage? {
         guard let url = Bundle.module.url(forResource: "menubar-icon-template", withExtension: "pdf"),
               let image = NSImage(contentsOf: url) else {
             return nil
         }
-        image.isTemplate = true
+        return image
+    }
+
+    private static func makeFallbackStatusIcon(size: CGFloat) -> NSImage? {
+        let image = NSImage(size: NSSize(width: size, height: size))
+        image.lockFocus()
+        defer { image.unlockFocus() }
+
+        NSColor.white.setFill()
+
+        let circleDiameter = size * 0.64
+        let circleRect = NSRect(
+            x: (size - circleDiameter) / 2,
+            y: size * 0.12,
+            width: circleDiameter,
+            height: circleDiameter
+        )
+        NSBezierPath(ovalIn: circleRect).fill()
+
+        let leafPath = NSBezierPath()
+        leafPath.move(to: NSPoint(x: size * 0.50, y: size * 0.92))
+        leafPath.curve(to: NSPoint(x: size * 0.34, y: size * 0.74), controlPoint1: NSPoint(x: size * 0.42, y: size * 0.92), controlPoint2: NSPoint(x: size * 0.35, y: size * 0.84))
+        leafPath.curve(to: NSPoint(x: size * 0.50, y: size * 0.72), controlPoint1: NSPoint(x: size * 0.39, y: size * 0.77), controlPoint2: NSPoint(x: size * 0.45, y: size * 0.75))
+        leafPath.curve(to: NSPoint(x: size * 0.66, y: size * 0.74), controlPoint1: NSPoint(x: size * 0.55, y: size * 0.75), controlPoint2: NSPoint(x: size * 0.61, y: size * 0.77))
+        leafPath.curve(to: NSPoint(x: size * 0.50, y: size * 0.92), controlPoint1: NSPoint(x: size * 0.65, y: size * 0.84), controlPoint2: NSPoint(x: size * 0.58, y: size * 0.92))
+        leafPath.close()
+        leafPath.fill()
+
+        image.isTemplate = false
+        return image
+    }
+
+    private lazy var menuBarIcon: NSImage? = {
+        guard let image = customStatusIconLoader() else {
+            return nil
+        }
+        image.isTemplate = false
         image.size = NSSize(width: Layout.iconSize, height: Layout.iconSize)
         return image
     }()
@@ -57,7 +95,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         onOpenStats: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
         onQuit: (() -> Void)? = nil,
-        statsProvider: (() -> TodayStats)? = nil
+        statsProvider: (() -> TodayStats)? = nil,
+        customStatusIconLoader: @escaping () -> NSImage? = MenuBarController.loadBundledStatusIcon,
+        systemSymbolLoader: @escaping (String, String) -> NSImage? = { name, description in
+            NSImage(systemSymbolName: name, accessibilityDescription: description)
+        }
     ) {
         self.onToggle = onToggle
         self.onReset = onReset
@@ -65,6 +107,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
         self.statsProvider = statsProvider
+        self.customStatusIconLoader = customStatusIconLoader
+        self.systemSymbolLoader = systemSymbolLoader
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.menu = NSMenu()
         super.init()
@@ -105,7 +149,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let minutes = seconds / 60
         let secs = seconds % 60
         let text = String(format: "%02d:%02d", minutes, secs)
-        statusItem.button?.title = text
+        setStatusButtonTitle(text)
         let resolvedLabel = label ?? Localization.localized("menu.status.remaining")
         statusTitleItem.title = "\(resolvedLabel): \(text)"
         currentMode = isBreak ? .rest : .work
@@ -114,7 +158,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func setStatus(text: String, mode: TimerMode) {
-        statusItem.button?.title = ""
+        setStatusButtonTitle("")
         statusTitleItem.title = text
         currentMode = mode
         updateStatusIcon(isRunning: false)
@@ -122,9 +166,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func configureStatusItem() {
-        guard let button = statusItem.button else { return }
-        button.title = ""
+        guard statusItem.button != nil else { return }
+        setStatusButtonTitle("")
         updateStatusIcon(isRunning: false)
+    }
+
+    private func setStatusButtonTitle(_ text: String) {
+        guard let button = statusItem.button else { return }
+        button.title = text
+        if #available(macOS 10.14, *) {
+            button.attributedTitle = NSAttributedString(
+                string: text,
+                attributes: [.foregroundColor: NSColor.white]
+            )
+        }
     }
 
     private func updateStatusIcon(isRunning: Bool) {
@@ -133,18 +188,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if let icon = menuBarIcon {
             button.image = icon
             button.imagePosition = .imageLeading
-        } else if let icon = NSImage(systemSymbolName: "timer.circle", accessibilityDescription: Localization.localized("menu.accessibility.pomodoro")) {
+        } else if let icon = systemSymbolLoader("timer.circle", Localization.localized("menu.accessibility.pomodoro")) {
             icon.isTemplate = true
             icon.size = NSSize(width: Layout.iconSize, height: Layout.iconSize)
             button.image = icon
             button.imagePosition = .imageLeading
+        } else if let icon = Self.makeFallbackStatusIcon(size: Layout.iconSize) {
+            button.image = icon
+            button.imagePosition = .imageLeading
         } else {
             button.image = nil
-            button.title = "🍅"
+            setStatusButtonTitle("")
         }
 
         if #available(macOS 10.14, *) {
-            button.contentTintColor = .labelColor
+            button.contentTintColor = .white
         }
     }
 
