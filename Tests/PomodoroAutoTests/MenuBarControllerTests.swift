@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import XCTest
 @testable import PomodoroAuto
 
@@ -45,6 +46,32 @@ final class MenuBarControllerTests: XCTestCase {
 
         let color = attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
         assertColorIsWhite(color)
+
+        if let cell = button.cell as? NSButtonCell {
+            let cellColor = cell.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+            assertColorIsWhite(cellColor)
+        } else {
+            XCTFail("Expected NSButtonCell")
+        }
+    }
+
+    func testSetRemainingRendersWhiteTimerTextLayer() {
+        let controller = MenuBarController()
+        controller.setRemaining(seconds: 90)
+
+        guard let button = statusButton(from: controller) else {
+            XCTFail("Expected status button to exist")
+            return
+        }
+
+        guard let textLayer = findTimerTextLayer(in: button.layer) else {
+            XCTFail("Expected timer text layer")
+            return
+        }
+
+        XCTAssertEqual(textLayer.string as? String, "01:30")
+        let layerColor = textLayer.foregroundColor.flatMap(NSColor.init(cgColor:))
+        assertColorIsWhite(layerColor)
     }
 
     func testSetRemainingForcesDarkStatusButtonAppearance() {
@@ -108,5 +135,20 @@ final class MenuBarControllerTests: XCTestCase {
         XCTAssertEqual(rgbColor.redComponent, 1.0, accuracy: 0.001, file: file, line: line)
         XCTAssertEqual(rgbColor.greenComponent, 1.0, accuracy: 0.001, file: file, line: line)
         XCTAssertEqual(rgbColor.blueComponent, 1.0, accuracy: 0.001, file: file, line: line)
+    }
+
+    private func findTimerTextLayer(in layer: CALayer?) -> CATextLayer? {
+        guard let layer else { return nil }
+        if let textLayer = layer as? CATextLayer,
+           let text = textLayer.string as? String,
+           text.contains(":") {
+            return textLayer
+        }
+        for sublayer in layer.sublayers ?? [] {
+            if let found = findTimerTextLayer(in: sublayer) {
+                return found
+            }
+        }
+        return nil
     }
 }

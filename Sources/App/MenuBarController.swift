@@ -43,6 +43,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var totalDuration: Int = 25 * 60
     private var progressLayer: CAShapeLayer?
     private var backgroundLayer: CAShapeLayer?
+    private var timerTextLayer: CATextLayer?
     private static func loadBundledStatusIcon() -> NSImage? {
         guard let url = Bundle.module.url(forResource: "menubar-icon-template", withExtension: "pdf"),
               let image = NSImage(contentsOf: url) else {
@@ -176,13 +177,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if #available(macOS 10.14, *) {
             button.appearance = NSAppearance(named: .vibrantDark)
         }
-        button.title = text
+        button.title = timerTextLayer == nil ? text : ""
         if #available(macOS 10.14, *) {
-            button.attributedTitle = NSAttributedString(
+            let attributedTitle = NSAttributedString(
                 string: text,
                 attributes: [.foregroundColor: NSColor.white]
             )
+            button.attributedTitle = attributedTitle
+            if let cell = button.cell as? NSButtonCell {
+                cell.attributedTitle = attributedTitle
+            }
         }
+        if let timerTextLayer {
+            timerTextLayer.string = text
+            timerTextLayer.isHidden = text.isEmpty
+        }
+        updateProgressRingPosition()
     }
 
     private func updateStatusIcon(isRunning: Bool) {
@@ -245,9 +255,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         progLayer.frame = CGRect(x: 0, y: 0, width: size, height: size)
         progLayer.isHidden = true
         progressLayer = progLayer
+
+        let textLayer = CATextLayer()
+        textLayer.foregroundColor = NSColor.white.cgColor
+        textLayer.fontSize = 12
+        textLayer.alignmentMode = .left
+        textLayer.truncationMode = .none
+        textLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 2
+        textLayer.string = ""
+        textLayer.isHidden = true
+        timerTextLayer = textLayer
         
         button.layer?.addSublayer(bgLayer)
         button.layer?.addSublayer(progLayer)
+        button.layer?.addSublayer(textLayer)
         
         updateProgressRingPosition()
     }
@@ -275,6 +296,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         CATransaction.setDisableActions(true)
         bgLayer.frame.origin = CGPoint(x: xOffset, y: yOffset)
         progLayer.frame.origin = CGPoint(x: xOffset, y: yOffset)
+        if let timerTextLayer {
+            let textX = xOffset + ringSize + 5
+            let textHeight: CGFloat = 14
+            let textWidth = max(0, buttonBounds.width - textX - 4)
+            timerTextLayer.frame = CGRect(
+                x: textX,
+                y: (buttonBounds.height - textHeight) / 2,
+                width: textWidth,
+                height: textHeight
+            )
+            timerTextLayer.contentsScale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        }
         CATransaction.commit()
     }
 
