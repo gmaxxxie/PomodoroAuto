@@ -47,6 +47,18 @@ final class MenuBarControllerTests: XCTestCase {
         assertColorIsWhite(color)
     }
 
+    func testSetRemainingForcesDarkStatusButtonAppearance() {
+        let controller = MenuBarController()
+        controller.setRemaining(seconds: 90)
+
+        guard let button = statusButton(from: controller) else {
+            XCTFail("Expected status button to exist")
+            return
+        }
+
+        XCTAssertEqual(button.appearance?.name, .vibrantDark)
+    }
+
     func testSetRemainingUsesNonTemplateStatusImage() {
         let controller = MenuBarController()
         controller.setRemaining(seconds: 90)

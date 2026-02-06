@@ -173,6 +173,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func setStatusButtonTitle(_ text: String) {
         guard let button = statusItem.button else { return }
+        if #available(macOS 10.14, *) {
+            button.appearance = NSAppearance(named: .vibrantDark)
+        }
         button.title = text
         if #available(macOS 10.14, *) {
             button.attributedTitle = NSAttributedString(
