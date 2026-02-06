@@ -53,9 +53,8 @@ final class BreakOverlayWindowController: NSWindowController {
 
     func dismiss() {
         cancelDismissTimer()
-        overlayView?.animateFadeOut { [weak self] in
-            self?.window?.orderOut(nil)
-            self?.onDismiss?()
+        dismissOverlay { [onDismiss] in
+            onDismiss?()
         }
     }
 
@@ -65,9 +64,8 @@ final class BreakOverlayWindowController: NSWindowController {
 
     func skipBreakAndStartWork() {
         cancelDismissTimer()
-        overlayView?.animateFadeOut { [weak self] in
-            self?.window?.orderOut(nil)
-            self?.onSkipBreak?()
+        dismissOverlay { [onSkipBreak] in
+            onSkipBreak?()
         }
     }
 
@@ -93,6 +91,21 @@ final class BreakOverlayWindowController: NSWindowController {
     private func cancelDismissTimer() {
         dismissTimer?.cancel()
         dismissTimer = nil
+    }
+
+    private func dismissOverlay(completion: (() -> Void)? = nil) {
+        let overlayWindow = window
+        guard let view = overlayView else {
+            overlayWindow?.orderOut(nil)
+            completion?()
+            return
+        }
+
+        view.animateFadeOut { [weak self] in
+            overlayWindow?.orderOut(nil)
+            self?.overlayView = nil
+            completion?()
+        }
     }
 
     deinit {

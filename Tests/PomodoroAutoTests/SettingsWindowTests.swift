@@ -485,7 +485,7 @@ final class SettingsWindowTests: XCTestCase {
                     }
                 }
                 if hasFlowContainer || stack.arrangedSubviews.isEmpty {
-                    let parentSection = findParentSection(of: stack, in: controller.window?.contentView)
+                    let parentSection = findParentSection(of: stack, in: view.window?.contentView)
                     if !parentSection.isEmpty {
                         let isAutoStartSection = parentSection.contains("Auto Start") || parentSection.contains("Terminal")
                         if isAutoStart == isAutoStartSection {

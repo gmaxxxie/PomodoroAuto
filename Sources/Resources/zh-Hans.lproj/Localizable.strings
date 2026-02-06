@@ -97,6 +97,7 @@
 "overlay.continuation.message" = "准备开始下一个番茄钟？";
 "overlay.continuation.startNext" = "继续下一个";
 "overlay.continuation.stop" = "停止";
+"overlay.continuation.close" = "关闭";
 
 "notification.action.startNext" = "继续下一个";
 "notification.action.stop" = "停止";

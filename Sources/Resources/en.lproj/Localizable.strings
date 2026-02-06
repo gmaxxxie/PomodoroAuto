@@ -97,6 +97,7 @@
 "overlay.continuation.message" = "Ready to start the next pomodoro?";
 "overlay.continuation.startNext" = "Start Next";
 "overlay.continuation.stop" = "Stop";
+"overlay.continuation.close" = "Close";
 
 "notification.action.startNext" = "Start Next";
 "notification.action.stop" = "Stop";

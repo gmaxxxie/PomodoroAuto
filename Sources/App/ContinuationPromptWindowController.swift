@@ -8,6 +8,7 @@ final class ContinuationPromptWindow: NSWindow {
 final class ContinuationPromptWindowController: NSWindowController {
     var onStartNext: (() -> Void)?
     var onStop: (() -> Void)?
+    var onClose: (() -> Void)?
 
     init() {
         let window = ContinuationPromptWindow(
@@ -30,7 +31,13 @@ final class ContinuationPromptWindowController: NSWindowController {
         return nil
     }
 
-    func show(title: String, message: String, startNextTitle: String, stopTitle: String) {
+    func show(
+        title: String,
+        message: String,
+        startNextTitle: String,
+        stopTitle: String,
+        closeTitle: String
+    ) {
         guard let screen = NSScreen.main else { return }
 
         let frame = screen.frame
@@ -42,11 +49,15 @@ final class ContinuationPromptWindowController: NSWindowController {
             message: message,
             startNextTitle: startNextTitle,
             stopTitle: stopTitle,
+            closeTitle: closeTitle,
             onStartNext: { [weak self] in
                 self?.handleStartNext()
             },
             onStop: { [weak self] in
                 self?.handleStop()
+            },
+            onClose: { [weak self] in
+                self?.handleClose()
             }
         )
         window?.contentView = view
@@ -79,6 +90,11 @@ final class ContinuationPromptWindowController: NSWindowController {
         dismiss { callback?() }
     }
 
+    private func handleClose() {
+        let callback = onClose
+        dismiss { callback?() }
+    }
+
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 {
             handleStop()
@@ -95,8 +111,10 @@ final class ContinuationPromptView: NSView {
     private let messageLabel = NSTextField(labelWithString: "")
     private let startNextButton = NSButton()
     private let stopButton = NSButton()
+    private let closeButton = NSButton()
     private var onStartNext: (() -> Void)?
     private var onStop: (() -> Void)?
+    private var onClose: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -121,7 +139,7 @@ final class ContinuationPromptView: NSView {
         configureMessageLabel()
         configureButtons()
 
-        let buttonStack = NSStackView(views: [startNextButton, stopButton])
+        let buttonStack = NSStackView(views: [startNextButton, stopButton, closeButton])
         buttonStack.orientation = .horizontal
         buttonStack.spacing = 16
 
@@ -138,7 +156,9 @@ final class ContinuationPromptView: NSView {
             startNextButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140),
             startNextButton.heightAnchor.constraint(equalToConstant: 44),
             stopButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140),
-            stopButton.heightAnchor.constraint(equalToConstant: 44)
+            stopButton.heightAnchor.constraint(equalToConstant: 44),
+            closeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            closeButton.heightAnchor.constraint(equalToConstant: 44)
         ])
     }
 
@@ -178,6 +198,16 @@ final class ContinuationPromptView: NSView {
         stopButton.font = NSFont.systemFont(ofSize: 18, weight: .semibold)
         stopButton.target = self
         stopButton.action = #selector(stopTapped)
+
+        closeButton.bezelStyle = .rounded
+        closeButton.isBordered = true
+        closeButton.wantsLayer = true
+        closeButton.layer?.backgroundColor = NSColor.systemGray.withAlphaComponent(0.5).cgColor
+        closeButton.layer?.cornerRadius = 8
+        closeButton.contentTintColor = .white
+        closeButton.font = NSFont.systemFont(ofSize: 18, weight: .medium)
+        closeButton.target = self
+        closeButton.action = #selector(closeTapped)
     }
 
     func configure(
@@ -185,15 +215,19 @@ final class ContinuationPromptView: NSView {
         message: String,
         startNextTitle: String,
         stopTitle: String,
+        closeTitle: String,
         onStartNext: @escaping () -> Void,
-        onStop: @escaping () -> Void
+        onStop: @escaping () -> Void,
+        onClose: @escaping () -> Void
     ) {
         titleLabel.stringValue = title
         messageLabel.stringValue = message
         startNextButton.title = startNextTitle
         stopButton.title = stopTitle
+        closeButton.title = closeTitle
         self.onStartNext = onStartNext
         self.onStop = onStop
+        self.onClose = onClose
     }
 
     @objc private func startNextTapped() {
@@ -202,6 +236,10 @@ final class ContinuationPromptView: NSView {
 
     @objc private func stopTapped() {
         onStop?()
+    }
+
+    @objc private func closeTapped() {
+        onClose?()
     }
 
     func animateFadeIn(duration: TimeInterval = 0.3) {

@@ -412,6 +412,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard NSScreen.main != nil else { return }
         let prompt = BreakPromptProvider.randomPrompt()
         breakOverlay = BreakOverlayWindowController()
+        breakOverlay?.onDismiss = { [weak self] in
+            self?.breakOverlay = nil
+        }
         breakOverlay?.onSkipBreak = { [weak self] in
             guard let self else { return }
             self.breakTimer.pause()
@@ -429,7 +432,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func showContinuationPrompt() {
         guard NSScreen.main != nil else { return }
         breakOverlay?.dismiss()
-        breakOverlay = nil
         
         continuationPrompt = ContinuationPromptWindowController()
         continuationPrompt?.onStartNext = { [weak self] in
@@ -442,11 +444,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             self.continuationPrompt = nil
             self.resetTimer()
         }
+        continuationPrompt?.onClose = { [weak self] in
+            self?.continuationPrompt = nil
+        }
         continuationPrompt?.show(
             title: Localization.localized("overlay.continuation.title"),
             message: Localization.localized("overlay.continuation.message"),
             startNextTitle: Localization.localized("overlay.continuation.startNext"),
-            stopTitle: Localization.localized("overlay.continuation.stop")
+            stopTitle: Localization.localized("overlay.continuation.stop"),
+            closeTitle: Localization.localized("overlay.continuation.close")
         )
     }
 
