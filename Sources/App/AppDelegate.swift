@@ -82,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         breakTimer.onComplete = { [weak self] in
             guard let self else { return }
+            self.isAutoStartSuppressed = true
             self.state = .paused
             self.updateStatusTextForCurrentState()
             self.sendBreakEndedNotification()
@@ -229,8 +230,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         currentlySuppressed: Bool,
         isWork: Bool
     ) -> Bool {
-        guard currentlySuppressed else { return false }
-        return isWork
+        _ = isWork
+        return currentlySuppressed
     }
 
     static func shouldPauseWorkTimer(
@@ -247,7 +248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
         if workTimer.isRunning {
-            pauseTimer()
+            pauseTimerAndSuppressAutoStart()
         } else {
             startTimer()
         }
@@ -258,6 +259,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         endActiveSessionAndFlush()
         state = .paused
         updateStatusTextForCurrentState()
+    }
+
+    private func pauseTimerAndSuppressAutoStart() {
+        isAutoStartSuppressed = true
+        pauseTimer()
     }
 
     private func resetTimer() {
@@ -514,15 +520,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             self.continuationPrompt = nil
             self.stopAndSuppressAutoStart()
         }
-        continuationPrompt?.onClose = { [weak self] in
-            self?.continuationPrompt = nil
-        }
         continuationPrompt?.show(
             title: Localization.localized("overlay.continuation.title"),
             message: Localization.localized("overlay.continuation.message"),
             startNextTitle: Localization.localized("overlay.continuation.startNext"),
-            stopTitle: Localization.localized("overlay.continuation.stop"),
-            closeTitle: Localization.localized("overlay.continuation.close")
+            stopTitle: Localization.localized("overlay.continuation.stop")
         )
     }
 

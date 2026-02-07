@@ -30,7 +30,7 @@ final class OverlayWindowControllerTests: XCTestCase {
         XCTAssertFalse(window.isVisible, "Overlay window should be ordered out after dismiss")
     }
 
-    func testContinuationPromptIncludesCloseButtonAndCloseOnlyDismissesPrompt() throws {
+    func testContinuationPromptShowsOnlyStartAndStopActions() throws {
         guard NSScreen.main != nil else {
             throw XCTSkip("No main screen is available for overlay window tests")
         }
@@ -46,8 +46,7 @@ final class OverlayWindowControllerTests: XCTestCase {
             title: "Break Complete",
             message: "Ready for next pomodoro?",
             startNextTitle: "StartTest",
-            stopTitle: "StopTest",
-            closeTitle: "CloseTest"
+            stopTitle: "StopTest"
         )
 
         guard let rootView = controller.window?.contentView else {
@@ -55,17 +54,11 @@ final class OverlayWindowControllerTests: XCTestCase {
             return
         }
 
-        guard let closeButton = findButton(in: rootView, title: "CloseTest") else {
-            XCTFail("Continuation prompt should include a close button")
-            return
-        }
-
-        closeButton.performClick(nil)
-        runMainLoop(for: 0.35)
-
-        XCTAssertFalse(controller.window?.isVisible ?? true, "Prompt should dismiss after clicking close")
-        XCTAssertFalse(didStartNext, "Close should not trigger start next action")
-        XCTAssertFalse(didStop, "Close should not trigger stop action")
+        XCTAssertNotNil(findButton(in: rootView, title: "StartTest"), "Continuation prompt should include start action")
+        XCTAssertNotNil(findButton(in: rootView, title: "StopTest"), "Continuation prompt should include stop action")
+        XCTAssertNil(findButton(in: rootView, title: "CloseTest"), "Continuation prompt should not include close action")
+        XCTAssertFalse(didStartNext, "Rendering prompt should not trigger start")
+        XCTAssertFalse(didStop, "Rendering prompt should not trigger stop")
     }
 
     private func runMainLoop(for seconds: TimeInterval) {
