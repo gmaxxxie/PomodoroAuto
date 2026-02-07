@@ -25,8 +25,10 @@ final class FocusStateDetector {
         return FocusSnapshot(appName: appName, bundleId: bundleId, isFullscreen: isFullscreen, timestamp: Date())
     }
 
-    func runningBundleIds() -> Set<String> {
-        Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier })
+    func runningAllowlistBundleIds(from allowlistBundleIds: [String]) -> Set<String> {
+        Set(allowlistBundleIds.filter { bundleId in
+            !NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).isEmpty
+        })
     }
 
     private func focusedWindowIsFullscreen() -> Bool {

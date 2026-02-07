@@ -102,6 +102,22 @@ final class SettingsWindowTests: XCTestCase {
         let textField = findTextField(placeholder: "com.apple.Terminal, com.apple.dt.Xcode")
         XCTAssertEqual(textField?.stringValue, "com.test.popup.zero")
     }
+
+    func testAppPopupMenuItemsDoNotLoadPerAppIcons() {
+        guard let popup = findPopUpButton(menuTitle: "autoStartApps") else {
+            XCTFail("Could not find auto-start app popup")
+            return
+        }
+
+        let appItems = popup.menu?.items.filter { item in
+            item.tag == 1002 && (item.representedObject as? String) != nil
+        } ?? []
+
+        XCTAssertFalse(appItems.isEmpty, "Expected installed app items in auto-start popup")
+        for item in appItems {
+            XCTAssertNil(item.image, "Popup app items should not hold per-app icons to reduce memory usage")
+        }
+    }
     
     // MARK: - Save Settings Tests
     
@@ -217,12 +233,12 @@ final class SettingsWindowTests: XCTestCase {
         let testController = SettingsWindowController(settings: store, statsStore: statsStore, onSave: {})
         _ = testController.window
         
-        let checkbox = findCheckbox(in: testController.window?.contentView, title: "Auto start/pause")
+        let checkbox = findCheckbox(in: testController.window?.contentView, title: Localization.localized("settings.autoStart"))
         XCTAssertEqual(checkbox?.state, .off)
     }
     
     func testAutoStartCheckboxSavesState() {
-        let checkbox = findCheckbox(in: controller.window?.contentView, title: "Auto start/pause")
+        let checkbox = findCheckbox(in: controller.window?.contentView, title: Localization.localized("settings.autoStart"))
         checkbox?.state = .off
         
         let saveSelector = Selector("handleSave")
@@ -237,12 +253,12 @@ final class SettingsWindowTests: XCTestCase {
         let testController = SettingsWindowController(settings: store, statsStore: statsStore, onSave: {})
         _ = testController.window
         
-        let checkbox = findCheckbox(in: testController.window?.contentView, title: "Fullscreen non-work")
+        let checkbox = findCheckbox(in: testController.window?.contentView, title: Localization.localized("settings.fullscreenNonWork"))
         XCTAssertEqual(checkbox?.state, .off)
     }
     
     func testFullscreenCheckboxSavesState() {
-        let checkbox = findCheckbox(in: controller.window?.contentView, title: "Fullscreen non-work")
+        let checkbox = findCheckbox(in: controller.window?.contentView, title: Localization.localized("settings.fullscreenNonWork"))
         checkbox?.state = .off
         
         let saveSelector = Selector("handleSave")

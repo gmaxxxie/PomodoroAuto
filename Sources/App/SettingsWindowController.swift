@@ -1,6 +1,6 @@
 import AppKit
 
-final class SettingsWindowController: NSWindowController, NSMenuDelegate {
+final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWindowDelegate {
     private enum Layout {
         static let cardMaxWidth: CGFloat = 620
         static let cardMinWidth: CGFloat = 520
@@ -8,6 +8,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
     private let settings: SettingsStore
     private let statsStore: StatsStore
     private let onSave: () -> Void
+    var onClose: (() -> Void)?
 
     private let workMinutesField = NSTextField()
     private let breakMinutesField = NSTextField()
@@ -21,6 +22,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
     private let whitelistSearchField = NSSearchField()
     private let languagePopup = NSPopUpButton()
     private var installedAppsCache: [AppInfo] = []
+    private var selectedAppIconCache: [String: NSImage] = [:]
 
     private let autoStartChipsContainer = NSStackView()
     private let whitelistChipsContainer = NSStackView()
@@ -28,7 +30,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
     private struct AppInfo {
         let name: String
         let bundleId: String
-        let icon: NSImage?
+        let bundlePath: String
     }
 
     init(settings: SettingsStore, statsStore: StatsStore, onSave: @escaping () -> Void) {
@@ -55,6 +57,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         if #available(macOS 11.0, *) {
             window.level = .floating
         }
+        window.delegate = self
 
         buildContent()
         loadValues()
@@ -627,7 +630,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         stack.translatesAutoresizingMaskIntoConstraints = false
         chip.addSubview(stack)
 
-        if let icon = appInfo?.icon {
+        if let icon = appIcon(for: appInfo) {
             let iconView = NSImageView(image: icon)
             iconView.imageScaling = .scaleProportionallyUpOrDown
             iconView.translatesAutoresizingMaskIntoConstraints = false
@@ -833,9 +836,6 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
                 }
             }
             let item = NSMenuItem(title: "\(app.name) (\(app.bundleId))", action: nil, keyEquivalent: "")
-            if let icon = app.icon {
-                item.image = icon
-            }
             item.representedObject = app.bundleId
             item.tag = baseTag + 2
             item.state = selectedIds.contains(app.bundleId) ? .on : .off
@@ -906,6 +906,14 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
         }
     }
 
+    func windowWillClose(_ notification: Notification) {
+        installedAppsCache.removeAll(keepingCapacity: false)
+        selectedAppIconCache.removeAll(keepingCapacity: false)
+        autoStartAppPopup.menu?.removeAllItems()
+        whitelistAppPopup.menu?.removeAllItems()
+        onClose?()
+    }
+
     private func installedApps() -> [AppInfo] {
         if installedAppsCache.isEmpty {
             installedAppsCache = loadInstalledApps()
@@ -945,12 +953,21 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate {
                     (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
                     ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
                     ?? url.deletingPathExtension().lastPathComponent
-                let icon = NSWorkspace.shared.icon(forFile: url.path)
-                icon.size = NSSize(width: 16, height: 16)
-                results.append(AppInfo(name: name, bundleId: bundleId, icon: icon))
+                results.append(AppInfo(name: name, bundleId: bundleId, bundlePath: url.path))
             }
         }
 
         return results.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func appIcon(for appInfo: AppInfo?) -> NSImage? {
+        guard let appInfo else { return nil }
+        if let icon = selectedAppIconCache[appInfo.bundleId] {
+            return icon
+        }
+        let icon = NSWorkspace.shared.icon(forFile: appInfo.bundlePath)
+        icon.size = NSSize(width: 16, height: 16)
+        selectedAppIconCache[appInfo.bundleId] = icon
+        return icon
     }
 }

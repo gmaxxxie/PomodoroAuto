@@ -81,7 +81,8 @@
 "stats.reset.alert.cancel" = "取消";
 
 "overlay.break.title" = "休息时间";
-"overlay.break.dismiss" = "按 ESC 关闭";
+"overlay.break.dismiss" = "按 ESC 或点击关闭";
+"overlay.break.close" = "关闭";
 "overlay.break.prompt.1" = "站起来活动一下身体";
 "overlay.break.prompt.2" = "喝杯水补充水分";
 "overlay.break.prompt.3" = "眺望远方放松眼睛";

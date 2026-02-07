@@ -26,8 +26,20 @@ BUILD_BIN_DIR="$(swift build --configuration release --show-bin-path)"
 ARCH=$(uname -m)
 BUILD_DIR=".build/release"
 
+VOLUME_DEVICE="$(df "$SCRIPT_DIR" | tail -1 | awk '{print $1}')"
+FILESYSTEM_TYPE="local"
+if [[ "$VOLUME_DEVICE" == //* ]]; then
+    FILESYSTEM_TYPE="smbfs"
+fi
+INSTALL_DIR="$SCRIPT_DIR"
+if [[ "$FILESYSTEM_TYPE" == "smbfs" ]]; then
+    INSTALL_DIR="$HOME/Applications"
+    mkdir -p "$INSTALL_DIR"
+    echo "ℹ️  Detected SMB workspace; installing app to local disk at $INSTALL_DIR"
+fi
+
 # Create app bundle
-APP_PATH="$SCRIPT_DIR/PomodoroAuto.app"
+APP_PATH="$INSTALL_DIR/PomodoroAuto.app"
 APP_CONTENTS="$APP_PATH/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
@@ -101,6 +113,9 @@ chmod +x "$APP_MACOS/PomodoroAuto"
 echo ""
 echo "✅ Build complete!"
 echo "📦 App created at: $APP_PATH"
+if [[ "$FILESYSTEM_TYPE" == "smbfs" ]]; then
+    echo "ℹ️  SMB volume detected; run the local copy above to avoid network volume permission prompts."
+fi
 echo ""
 echo "🚀 To run: open $APP_PATH"
 echo ""

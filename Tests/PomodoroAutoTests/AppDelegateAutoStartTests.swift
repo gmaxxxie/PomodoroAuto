@@ -29,6 +29,14 @@ final class AppDelegateAutoStartTests: XCTestCase {
         XCTAssertFalse(shouldPrompt)
     }
 
+    func testShouldNotRequestNotificationAuthorizationOnLaunch() {
+        XCTAssertFalse(AppDelegate.shouldRequestNotificationAuthorizationOnLaunch)
+    }
+
+    func testShouldNotRequestAccessibilityAccessOnLaunch() {
+        XCTAssertFalse(AppDelegate.shouldRequestAccessibilityAccessOnLaunch)
+    }
+
     func testEvaluateWorkStateUsesRunningAllowlistEvenWhenFrontmostIsPomodoroAuto() {
         let snapshot = FocusSnapshot(
             appName: "PomodoroAuto",
@@ -47,8 +55,7 @@ final class AppDelegateAutoStartTests: XCTestCase {
         let isWork = AppDelegate.evaluateWorkState(
             snapshot: snapshot,
             appBundleId: "com.pomodoroauto.app",
-            runningBundleIds: ["com.work.app", "com.other.app"],
-            autoStartBundleIds: ["com.work.app"],
+            runningAllowlistApps: ["com.work.app"],
             ruleEngine: engine
         )
 
@@ -73,8 +80,7 @@ final class AppDelegateAutoStartTests: XCTestCase {
         let isWork = AppDelegate.evaluateWorkState(
             snapshot: snapshot,
             appBundleId: "com.pomodoroauto.app",
-            runningBundleIds: ["com.work.app"],
-            autoStartBundleIds: [],
+            runningAllowlistApps: [],
             ruleEngine: engine
         )
 

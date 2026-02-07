@@ -6,6 +6,8 @@ import os.log
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "PomodoroAuto", category: "AppDelegate")
+    static let shouldRequestAccessibilityAccessOnLaunch = false
+    static let shouldRequestNotificationAuthorizationOnLaunch = false
     private enum SessionState {
         case idle
         case running
@@ -50,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureNotifications()
-        if Self.shouldPromptAccessibilityAccess(
+        if Self.shouldRequestAccessibilityAccessOnLaunch && Self.shouldPromptAccessibilityAccess(
             autoStartEnabled: settings.autoStart,
             isAccessibilityTrusted: detector.isAccessibilityTrusted
         ) {
@@ -135,7 +137,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         )
         
         center.setNotificationCategories([breakEndedCategory])
-        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        if Self.shouldRequestNotificationAuthorizationOnLaunch {
+            center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
     }
 
     private func startFocusDetection() {
@@ -162,13 +166,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
 
-        let runningBundleIds = detector.runningBundleIds()
         let allowlistBundleIds = settings.autoStartBundleIds
+        let runningAllowlistApps = detector.runningAllowlistBundleIds(from: allowlistBundleIds)
         guard let isWork = Self.evaluateWorkState(
             snapshot: snapshot,
             appBundleId: Bundle.main.bundleIdentifier,
-            runningBundleIds: runningBundleIds,
-            autoStartBundleIds: allowlistBundleIds,
+            runningAllowlistApps: runningAllowlistApps,
             ruleEngine: ruleEngine
         ) else {
             return
@@ -206,11 +209,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     static func evaluateWorkState(
         snapshot: FocusSnapshot,
         appBundleId: String?,
-        runningBundleIds: Set<String>,
-        autoStartBundleIds: [String],
+        runningAllowlistApps: Set<String>,
         ruleEngine: RuleEngine
     ) -> Bool? {
-        let runningAllowlistApps = Set(autoStartBundleIds).intersection(runningBundleIds)
         if snapshot.bundleId == appBundleId && runningAllowlistApps.isEmpty {
             return nil
         }
@@ -417,6 +418,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             settingsWindow = SettingsWindowController(settings: settings, statsStore: statsStore) { [weak self] in
                 self?.applySettings()
             }
+            settingsWindow?.onClose = { [weak self] in
+                self?.settingsWindow = nil
+            }
         }
         if let window = settingsWindow?.window {
             positionWindowTopRight(window)
@@ -439,6 +443,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func openStats() {
         if statsWindow == nil {
             statsWindow = StatsWindowController(statsStore: statsStore)
+            statsWindow?.onClose = { [weak self] in
+                self?.statsWindow = nil
+            }
         }
         statsWindow?.updateStats()
         if let window = statsWindow?.window {
@@ -501,6 +508,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             title: Localization.localized("overlay.break.title"),
             message: prompt,
             footer: Localization.localized("overlay.break.dismiss"),
+            closeTitle: Localization.localized("overlay.break.close"),
             timeoutSeconds: 30
         )
     }

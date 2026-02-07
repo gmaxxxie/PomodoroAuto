@@ -18,7 +18,7 @@ final class SettingsStore {
         defaults.register(defaults: [
             Keys.workMinutes: 25,
             Keys.breakMinutes: 5,
-            Keys.autoStart: true,
+            Keys.autoStart: false,
             Keys.fullscreenNonWork: true,
             Keys.whitelistBundleIds: [],
             Keys.autoStartBundleIds: [],

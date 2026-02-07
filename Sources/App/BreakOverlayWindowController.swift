@@ -1,8 +1,22 @@
 import AppKit
 
 final class BreakOverlayWindow: NSWindow {
+    var onEscape: (() -> Void)?
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 {
+            onEscape?()
+            return
+        }
+        super.keyDown(with: event)
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        onEscape?()
+    }
 }
 
 final class BreakOverlayWindowController: NSWindowController {
@@ -26,20 +40,37 @@ final class BreakOverlayWindowController: NSWindowController {
         window.hasShadow = false
 
         super.init(window: window)
+        window.onEscape = { [weak self] in
+            self?.dismiss()
+        }
     }
 
     required init?(coder: NSCoder) {
         return nil
     }
 
-    func show(title: String, message: String, footer: String, timeoutSeconds: Int = 15) {
+    func show(
+        title: String,
+        message: String,
+        footer: String,
+        closeTitle: String = "Close",
+        timeoutSeconds: Int = 15
+    ) {
         guard let screen = NSScreen.main else { return }
 
         let frame = screen.frame
         window?.setFrame(frame, display: true)
 
         let view = BreakOverlayView(frame: frame)
-        view.configure(title: title, message: message, footer: footer)
+        view.configure(
+            title: title,
+            message: message,
+            footer: footer,
+            closeTitle: closeTitle,
+            onClose: { [weak self] in
+                self?.dismiss()
+            }
+        )
         window?.contentView = view
         overlayView = view
 
@@ -66,14 +97,6 @@ final class BreakOverlayWindowController: NSWindowController {
         cancelDismissTimer()
         dismissOverlay { [onSkipBreak] in
             onSkipBreak?()
-        }
-    }
-
-    override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { // ESC
-            dismiss()
-        } else {
-            super.keyDown(with: event)
         }
     }
 

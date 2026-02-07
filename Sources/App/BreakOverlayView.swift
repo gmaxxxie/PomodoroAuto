@@ -5,6 +5,8 @@ final class BreakOverlayView: NSView {
     private let countdownLabel = NSTextField(labelWithString: "")
     private let messageLabel = NSTextField(labelWithString: "")
     private let footerLabel = NSTextField(labelWithString: "")
+    private let closeButton = NSButton()
+    private var onClose: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -29,18 +31,22 @@ final class BreakOverlayView: NSView {
         configureCountdownLabel()
         configureMessageLabel()
         configureFooterLabel()
+        configureCloseButton()
 
         stack.addArrangedSubview(titleLabel)
         stack.addArrangedSubview(countdownLabel)
         stack.addArrangedSubview(messageLabel)
         stack.addArrangedSubview(footerLabel)
+        stack.addArrangedSubview(closeButton)
 
         addSubview(stack)
 
         NSLayoutConstraint.activate([
             stack.centerXAnchor.constraint(equalTo: centerXAnchor),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            stack.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.8)
+            stack.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.8),
+            closeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            closeButton.heightAnchor.constraint(equalToConstant: 40)
         ])
     }
 
@@ -72,10 +78,30 @@ final class BreakOverlayView: NSView {
         footerLabel.alignment = .center
     }
 
-    func configure(title: String, message: String, footer: String) {
+    private func configureCloseButton() {
+        closeButton.bezelStyle = .rounded
+        closeButton.isBordered = true
+        closeButton.wantsLayer = true
+        closeButton.layer?.backgroundColor = NSColor.systemGray.cgColor
+        closeButton.layer?.cornerRadius = 8
+        closeButton.contentTintColor = .white
+        closeButton.font = NSFont.systemFont(ofSize: 16, weight: .semibold)
+        closeButton.target = self
+        closeButton.action = #selector(closeTapped)
+    }
+
+    func configure(
+        title: String,
+        message: String,
+        footer: String,
+        closeTitle: String,
+        onClose: @escaping () -> Void
+    ) {
         titleLabel.stringValue = title
         messageLabel.stringValue = message
         footerLabel.stringValue = footer
+        closeButton.title = closeTitle
+        self.onClose = onClose
     }
 
     func updateCountdown(seconds: Int) {
@@ -99,5 +125,9 @@ final class BreakOverlayView: NSView {
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             self.animator().alphaValue = 0
         }, completionHandler: completion)
+    }
+
+    @objc private func closeTapped() {
+        onClose?()
     }
 }

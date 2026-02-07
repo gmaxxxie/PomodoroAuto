@@ -3,6 +3,7 @@ import QuartzCore
 
 final class StatsWindowController: NSWindowController, NSWindowDelegate {
     private let statsStore: StatsStore
+    var onClose: (() -> Void)?
     private var workTimeValueLabel: NSTextField?
     private var pomodoroValueLabel: NSTextField?
     private var progressRingLayer: CAShapeLayer?
@@ -54,6 +55,10 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidBecomeKey(_ notification: Notification) {
         updateStats()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onClose?()
     }
 
     func updateStats() {
