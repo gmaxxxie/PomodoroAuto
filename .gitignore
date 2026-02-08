@@ -9,3 +9,5 @@ xcuserdata/
 DerivedData/
 debug/
 .worktrees/
+PomodoroAuto.app.backup-*/
+PomodoroAuto.app.bad-*/
