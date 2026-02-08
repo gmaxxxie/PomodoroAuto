@@ -25,6 +25,7 @@ BUILD_BIN_DIR="$(swift build --configuration release --show-bin-path)"
 # Get architecture
 ARCH=$(uname -m)
 BUILD_DIR=".build/release"
+BUILD_VERSION=$(date +"%Y%m%d.%H%M%S")
 
 VOLUME_DEVICE="$(df "$SCRIPT_DIR" | tail -1 | awk '{print $1}')"
 FILESYSTEM_TYPE="local"
@@ -43,6 +44,7 @@ APP_PATH="$INSTALL_DIR/PomodoroAuto.app"
 APP_CONTENTS="$APP_PATH/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
+APP_MODULE_BUNDLE_PARENT="$APP_PATH"
 APP_ICON="$SCRIPT_DIR/Assets/Icons/AppIcon.icns"
 
 echo "📁 Creating app bundle..."
@@ -53,10 +55,12 @@ mkdir -p "$APP_RESOURCES"
 # Copy executable
 cp "$BUILD_DIR/PomodoroAuto" "$APP_MACOS/"
 
-# Copy SwiftPM resource bundle (localizations, assets)
+# Copy SwiftPM resource bundle (localizations, assets).
+# SwiftPM's generated Bundle.module accessor for this executable target
+# resolves from Bundle.main.bundleURL, which points at the .app root.
 RESOURCE_BUNDLE=$(find "$BUILD_BIN_DIR" -maxdepth 1 -name "PomodoroAuto_*.bundle" -print -quit)
 if [[ -n "$RESOURCE_BUNDLE" ]]; then
-    cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/"
+    cp -R "$RESOURCE_BUNDLE" "$APP_MODULE_BUNDLE_PARENT/"
 else
     echo "⚠️  Warning: Resource bundle not found; localized strings may not load."
 fi
@@ -70,7 +74,7 @@ fi
 cp "$APP_ICON" "$APP_RESOURCES/AppIcon.icns"
 
 # Create Info.plist
-cat > "$APP_CONTENTS/Info.plist" << 'EOF'
+cat > "$APP_CONTENTS/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -88,9 +92,9 @@ cat > "$APP_CONTENTS/Info.plist" << 'EOF'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>20260122.1</string>
+    <string>$BUILD_VERSION</string>
     <key>CFBundleVersion</key>
-    <string>20260122.1</string>
+    <string>$BUILD_VERSION</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>NSPrincipalClass</key>
@@ -114,7 +118,7 @@ echo ""
 echo "✅ Build complete!"
 echo "📦 App created at: $APP_PATH"
 if [[ "$FILESYSTEM_TYPE" == "smbfs" ]]; then
-    echo "ℹ️  SMB volume detected; run the local copy above to avoid network volume permission prompts."
+    echo "ℹ️  SMB volume detected; run the local copy above to avoid network volume launch failures."
 fi
 echo ""
 echo "🚀 To run: open $APP_PATH"
