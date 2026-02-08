@@ -16,6 +16,14 @@ final class ReleaseAutomationTests: XCTestCase {
         )
     }
 
+    func testReleaseWorkflowDoesNotUseUnsupportedInputsContextOnPush() throws {
+        let content = try readFile(path: ".github/workflows/release.yml")
+        XCTAssertFalse(
+            content.contains("${{ inputs.tag }}"),
+            "Push-triggered workflows should not rely on the workflow_dispatch-only inputs context."
+        )
+    }
+
     private func readFile(path: String) throws -> String {
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let fileURL = root.appendingPathComponent(path)

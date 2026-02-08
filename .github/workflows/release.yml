@@ -27,7 +27,7 @@ jobs:
       - name: Resolve release tag
         id: resolve_tag
         env:
-          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_TAG: ${{ github.event.inputs.tag || '' }}
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             TAG="${INPUT_TAG}"
