@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing git tag to release (example: v1.2.3)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: resolve_tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TAG="${INPUT_TAG}"
+            if [[ "${TAG}" == *"/"* ]]; then
+              echo "::error::Tag '${TAG}' cannot contain '/'."
+              exit 1
+            fi
+            if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+              echo "::error::Tag '${TAG}' does not exist in repository."
+              exit 1
+            fi
+            git checkout "refs/tags/${TAG}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build release artifact
+        run: |
+          chmod +x scripts/package-release.sh
+          scripts/package-release.sh "${{ steps.resolve_tag.outputs.tag }}"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PomodoroAuto-${{ steps.resolve_tag.outputs.tag }}-macOS
+          path: |
+            dist/PomodoroAuto-${{ steps.resolve_tag.outputs.tag }}-macOS.zip
+            dist/PomodoroAuto-${{ steps.resolve_tag.outputs.tag }}-macOS.dmg
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.resolve_tag.outputs.tag }}
+          name: PomodoroAuto ${{ steps.resolve_tag.outputs.tag }}
+          files: |
+            dist/PomodoroAuto-${{ steps.resolve_tag.outputs.tag }}-macOS.zip
+            dist/PomodoroAuto-${{ steps.resolve_tag.outputs.tag }}-macOS.dmg
+          generate_release_notes: true
+          fail_on_unmatched_files: true

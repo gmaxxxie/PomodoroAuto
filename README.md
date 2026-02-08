@@ -94,6 +94,31 @@ swift test
 swift package clean
 ```
 
+## 自动发布到 GitHub
+
+仓库已内置 GitHub Actions 工作流：`.github/workflows/release.yml`。
+
+### 触发方式
+
+1. 推送版本标签（推荐，自动发布）
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+2. 在 GitHub Actions 页面手动运行 `Release` 工作流，并填写已存在的标签（例如 `v0.1.0`）
+
+### 发布产物
+
+- `PomodoroAuto-<tag>-macOS.zip`（包含 `PomodoroAuto.app`）
+- `PomodoroAuto-<tag>-macOS.dmg`（磁盘镜像安装包）
+- 两个文件会同时上传到 workflow artifacts 和 GitHub Release assets
+
+### 首次启用前检查
+
+- GitHub 仓库 Settings → Actions → General → Workflow permissions 设为 `Read and write permissions`（允许工作流创建/更新 Release）
+
 ## 系统要求
 
 - macOS 12.0+
