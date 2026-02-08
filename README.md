@@ -10,9 +10,9 @@ macOS 菜单栏番茄钟应用：自动识别前台应用并自动开始/暂停�
 - 菜单栏快捷控制：轻量、不打扰
 
 ## 使用截图
-![菜单栏与主界面](docs/screenshots/menubar.png)
-![设置面板](docs/screenshots/settings.png)
-![统计面板](docs/screenshots/stats.png)
+![菜单栏（空闲状态）](pic/截屏2026-02-08%2021.02.48.png)
+![菜单栏（计时中）](pic/截屏2026-02-08%2021.03.08.png)
+![设置面板](pic/截屏2026-02-08%2021.03.37.png)
 
 ## 快速开始
 
