@@ -231,8 +231,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         currentlySuppressed: Bool,
         isWork: Bool
     ) -> Bool {
-        _ = isWork
-        return currentlySuppressed
+        // Clear suppression once the user leaves work context, so auto-start can recover on return.
+        currentlySuppressed && isWork
     }
 
     static func shouldPauseWorkTimer(
@@ -468,6 +468,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func applySettings() {
         ruleEngine = RuleEngine(config: settings.ruleConfig)
+        if Self.shouldPromptAccessibilityAccess(
+            autoStartEnabled: settings.autoStart,
+            isAccessibilityTrusted: detector.isAccessibilityTrusted
+        ) {
+            _ = detector.requestAccess()
+        }
         workTimer.setDuration(seconds: settings.workMinutes * 60)
         breakTimer.setDuration(seconds: settings.breakMinutes * 60)
         applyLocalization()

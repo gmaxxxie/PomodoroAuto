@@ -98,7 +98,7 @@ final class AppDelegateAutoStartTests: XCTestCase {
         XCTAssertFalse(shouldStart, "Explicit stop should suppress immediate auto-start")
     }
 
-    func testNextAutoStartSuppressionStateStaysSuppressedUntilManualRestart() {
+    func testNextAutoStartSuppressionStateClearsAfterLeavingWorkContext() {
         let stillSuppressed = AppDelegate.nextAutoStartSuppressionState(
             currentlySuppressed: true,
             isWork: true
@@ -109,7 +109,22 @@ final class AppDelegateAutoStartTests: XCTestCase {
             currentlySuppressed: true,
             isWork: false
         )
-        XCTAssertTrue(afterNonWorkSnapshot, "Suppression should stay enabled until user manually starts again")
+        XCTAssertFalse(afterNonWorkSnapshot, "Suppression should clear after leaving work context so auto-start can recover")
+    }
+
+    func testShouldStartTimerRecoversAfterSuppressionClearsOnNonWork() {
+        let suppressionAfterNonWork = AppDelegate.nextAutoStartSuppressionState(
+            currentlySuppressed: true,
+            isWork: false
+        )
+        let shouldStartWhenWorkReturns = AppDelegate.shouldStartTimer(
+            isWork: true,
+            workTimerRunning: false,
+            breakTimerRunning: false,
+            isAutoStartSuppressed: suppressionAfterNonWork
+        )
+
+        XCTAssertTrue(shouldStartWhenWorkReturns, "Auto-start should resume when user returns to a work app after suppression clears")
     }
 
     func testShouldPauseWorkTimerDoesNotPauseWhenIsWork() {
