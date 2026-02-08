@@ -4,12 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing git tag to release (example: v1.2.3)
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -26,22 +20,11 @@ jobs:
 
       - name: Resolve release tag
         id: resolve_tag
-        env:
-          INPUT_TAG: ${{ github.event.inputs.tag || '' }}
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            TAG="${INPUT_TAG}"
-            if [[ "${TAG}" == *"/"* ]]; then
-              echo "::error::Tag '${TAG}' cannot contain '/'."
-              exit 1
-            fi
-            if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
-              echo "::error::Tag '${TAG}' does not exist in repository."
-              exit 1
-            fi
-            git checkout "refs/tags/${TAG}"
-          else
-            TAG="${GITHUB_REF_NAME}"
+          TAG="${GITHUB_REF_NAME}"
+          if [[ "${TAG}" == *"/"* ]]; then
+            echo "::error::Tag '${TAG}' cannot contain '/'."
+            exit 1
           fi
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
 

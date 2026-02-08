@@ -107,7 +107,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-2. 在 GitHub Actions 页面手动运行 `Release` 工作流，并填写已存在的标签（例如 `v0.1.0`）
+2. 等待 GitHub Actions 中 `release.yml` 工作流完成（会自动创建 Release）
 
 ### 发布产物
 
