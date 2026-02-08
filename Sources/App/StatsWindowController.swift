@@ -58,7 +58,10 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        onClose?()
+        releaseWindowResources()
+        let closeHandler = onClose
+        onClose = nil
+        closeHandler?()
     }
 
     func updateStats() {
@@ -502,5 +505,32 @@ final class StatsWindowController: NSWindowController, NSWindowDelegate {
         daysTrackedTitleLabel?.stringValue = Localization.localized("stats.daysTracked")
         resetButton?.title = Localization.localized("stats.resetAll")
         updateMotivation(pomodoroCount: statsStore.statsForToday().pomodoroCount)
+    }
+
+    private func releaseWindowResources() {
+        window?.delegate = nil
+        progressRingLayer?.removeAllAnimations()
+        progressRingLayer?.removeFromSuperlayer()
+        progressRingLayer = nil
+
+        workTimeValueLabel = nil
+        pomodoroValueLabel = nil
+        motivationLabel = nil
+        subtitleLabel = nil
+        resetButton = nil
+        statsCardTitleLabel = nil
+        allTimeTitleLabel = nil
+        totalPomodorosTitleLabel = nil
+        totalWorkTimeTitleLabel = nil
+        avgPomodorosTitleLabel = nil
+        avgWorkTimeTitleLabel = nil
+        daysTrackedTitleLabel = nil
+        totalPomodoroLabel = nil
+        totalWorkTimeLabel = nil
+        avgPomodoroLabel = nil
+        avgWorkTimeLabel = nil
+        dayCountLabel = nil
+
+        window?.contentView?.subviews.forEach { $0.removeFromSuperview() }
     }
 }
