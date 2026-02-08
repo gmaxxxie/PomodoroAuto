@@ -8,6 +8,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
     private let settings: SettingsStore
     private let statsStore: StatsStore
     private let onSave: () -> Void
+    private let appSearchUrls: [URL]
     var onClose: (() -> Void)?
 
     private let workMinutesField = NSTextField()
@@ -33,10 +34,16 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
         let bundlePath: String
     }
 
-    init(settings: SettingsStore, statsStore: StatsStore, onSave: @escaping () -> Void) {
+    init(
+        settings: SettingsStore,
+        statsStore: StatsStore,
+        onSave: @escaping () -> Void,
+        appSearchUrls: [URL]? = nil
+    ) {
         self.settings = settings
         self.statsStore = statsStore
         self.onSave = onSave
+        self.appSearchUrls = appSearchUrls ?? Self.defaultAppSearchUrls(fileManager: .default)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 680, height: 600),
             styleMask: [.titled, .closable, .fullSizeContentView],
@@ -65,6 +72,16 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
 
     required init?(coder: NSCoder) {
         return nil
+    }
+
+    private static func defaultAppSearchUrls(fileManager: FileManager) -> [URL] {
+        [
+            URL(fileURLWithPath: "/Applications"),
+            URL(fileURLWithPath: "/Applications/Utilities"),
+            URL(fileURLWithPath: "/System/Applications"),
+            URL(fileURLWithPath: "/System/Applications/Utilities"),
+            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
+        ]
     }
 
     private func buildContent() {
@@ -907,11 +924,24 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
     }
 
     func windowWillClose(_ notification: Notification) {
+        window?.delegate = nil
         installedAppsCache.removeAll(keepingCapacity: false)
         selectedAppIconCache.removeAll(keepingCapacity: false)
+        autoStartAppPopup.menu?.delegate = nil
+        whitelistAppPopup.menu?.delegate = nil
+        autoStartAppPopup.target = nil
+        autoStartAppPopup.action = nil
+        whitelistAppPopup.target = nil
+        whitelistAppPopup.action = nil
+        autoStartSearchField.target = nil
+        autoStartSearchField.action = nil
+        whitelistSearchField.target = nil
+        whitelistSearchField.action = nil
         autoStartAppPopup.menu?.removeAllItems()
         whitelistAppPopup.menu?.removeAllItems()
-        onClose?()
+        let closeHandler = onClose
+        onClose = nil
+        closeHandler?()
     }
 
     private func installedApps() -> [AppInfo] {
@@ -929,35 +959,60 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
         var results: [AppInfo] = []
         var seen = Set<String>()
         let fileManager = FileManager.default
-        let searchUrls = [
-            URL(fileURLWithPath: "/Applications"),
-            URL(fileURLWithPath: "/Applications/Utilities"),
-            URL(fileURLWithPath: "/System/Applications"),
-            URL(fileURLWithPath: "/System/Applications/Utilities"),
-            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
-        ]
 
-        for base in searchUrls where fileManager.fileExists(atPath: base.path) {
-            guard let enumerator = fileManager.enumerator(
-                at: base,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            ) else { continue }
-            for case let url as URL in enumerator {
-                guard url.pathExtension == "app" else { continue }
-                guard let bundle = Bundle(url: url), let bundleId = bundle.bundleIdentifier else { continue }
-                if !seen.insert(bundleId).inserted {
+        for base in appSearchUrls where fileManager.fileExists(atPath: base.path) {
+            for appURL in appBundleURLs(in: base, fileManager: fileManager) {
+                guard let appInfo = appInfo(at: appURL) else { continue }
+                if !seen.insert(appInfo.bundleId).inserted {
                     continue
                 }
-                let name =
-                    (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
-                    ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
-                    ?? url.deletingPathExtension().lastPathComponent
-                results.append(AppInfo(name: name, bundleId: bundleId, bundlePath: url.path))
+                results.append(appInfo)
             }
         }
 
         return results.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func appBundleURLs(in base: URL, fileManager: FileManager) -> [URL] {
+        guard let contents = try? fileManager.contentsOfDirectory(
+            at: base,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .volumeIsLocalKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        return contents.filter { url in
+            guard url.pathExtension == "app" else { return false }
+            guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .volumeIsLocalKey]) else {
+                return false
+            }
+            guard values.isDirectory == true else { return false }
+            if values.isSymbolicLink == true {
+                return false
+            }
+            if let volumeIsLocal = values.volumeIsLocal, !volumeIsLocal {
+                return false
+            }
+            return true
+        }
+    }
+
+    private func appInfo(at appURL: URL) -> AppInfo? {
+        let infoPlistURL = appURL.appendingPathComponent("Contents/Info.plist")
+        guard let data = try? Data(contentsOf: infoPlistURL),
+              let plistObject = try? PropertyListSerialization.propertyList(from: data, format: nil),
+              let plist = plistObject as? [String: Any],
+              let bundleId = plist["CFBundleIdentifier"] as? String else {
+            return nil
+        }
+
+        let name =
+            (plist["CFBundleDisplayName"] as? String)
+            ?? (plist["CFBundleName"] as? String)
+            ?? appURL.deletingPathExtension().lastPathComponent
+
+        return AppInfo(name: name, bundleId: bundleId, bundlePath: appURL.path)
     }
 
     private func appIcon(for appInfo: AppInfo?) -> NSImage? {

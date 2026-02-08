@@ -449,6 +449,78 @@ final class SettingsWindowTests: XCTestCase {
         let chipCount = countChips(in: chipsContainer)
         XCTAssertEqual(chipCount, 2, "Should show 2 chips for preloaded apps")
     }
+
+    func testSettingsWindowControllerReleasesAfterClose() {
+        weak var weakController: SettingsWindowController?
+
+        autoreleasepool {
+            var localController: SettingsWindowController? = SettingsWindowController(
+                settings: store,
+                statsStore: statsStore,
+                onSave: {}
+            )
+            _ = localController?.window
+            weakController = localController
+            localController?.window?.close()
+            localController = nil
+        }
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertNil(weakController, "Settings window controller should be released after closing")
+    }
+
+    func testSettingsWindowCloseClearsOnCloseCallback() {
+        let testController = SettingsWindowController(settings: store, statsStore: statsStore, onSave: {})
+        _ = testController.window
+        testController.onClose = {}
+
+        testController.window?.close()
+
+        XCTAssertNil(testController.onClose, "onClose should be cleared when settings window closes")
+    }
+
+    func testInstalledAppsListSkipsNestedAppBundles() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let topLevelApp = root.appendingPathComponent("Top.app")
+        let nestedApp = root
+            .appendingPathComponent("Nested")
+            .appendingPathComponent("Inner.app")
+        try createFakeAppBundle(
+            at: topLevelApp,
+            bundleId: "com.test.top",
+            displayName: "Top"
+        )
+        try createFakeAppBundle(
+            at: nestedApp,
+            bundleId: "com.test.inner",
+            displayName: "Inner"
+        )
+
+        let testController = SettingsWindowController(
+            settings: store,
+            statsStore: statsStore,
+            onSave: {},
+            appSearchUrls: [root]
+        )
+        _ = testController.window
+
+        guard let contentView = testController.window?.contentView else {
+            XCTFail("Missing content view")
+            return
+        }
+
+        guard let popup = findPopUpButton(in: contentView, menuTitle: "autoStartApps") else {
+            XCTFail("Could not find auto-start app popup")
+            return
+        }
+
+        let bundleIds = popup.menu?.items.compactMap { $0.representedObject as? String } ?? []
+        XCTAssertTrue(bundleIds.contains("com.test.top"), "Top-level app should be included")
+        XCTAssertFalse(bundleIds.contains("com.test.inner"), "Nested app should not be included")
+    }
     
     // MARK: - Helper Methods
     
@@ -598,5 +670,19 @@ final class SettingsWindowTests: XCTestCase {
             }
         }
         return nil
+    }
+
+    private func createFakeAppBundle(at url: URL, bundleId: String, displayName: String) throws {
+        let contents = url.appendingPathComponent("Contents")
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        let infoPlist = contents.appendingPathComponent("Info.plist")
+        let data: [String: Any] = [
+            "CFBundleIdentifier": bundleId,
+            "CFBundleDisplayName": displayName,
+            "CFBundleName": displayName
+        ]
+        let dictionary = data as NSDictionary
+        let didWrite = dictionary.write(to: infoPlist, atomically: true)
+        XCTAssertTrue(didWrite, "Failed to write Info.plist for fake app bundle")
     }
 }
