@@ -20,7 +20,7 @@ final class MenuBarControllerTests: XCTestCase {
         super.tearDown()
     }
 
-    func testSetRemainingUsesWhiteStatusButtonTint() {
+    func testSetRemainingDoesNotForceStatusButtonTintColor() {
         let controller = MenuBarController()
         controller.setRemaining(seconds: 90)
 
@@ -29,10 +29,10 @@ final class MenuBarControllerTests: XCTestCase {
             return
         }
 
-        assertColorIsWhite(button.contentTintColor)
+        XCTAssertNil(button.contentTintColor)
     }
 
-    func testSetRemainingUsesWhiteStatusButtonTitleColor() {
+    func testSetRemainingDoesNotForceWhiteStatusButtonTitleColor() {
         let controller = MenuBarController()
         controller.setRemaining(seconds: 90)
 
@@ -45,17 +45,17 @@ final class MenuBarControllerTests: XCTestCase {
         XCTAssertEqual(attributedTitle.string, "01:30")
 
         let color = attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-        assertColorIsWhite(color)
+        assertColorIsNotForcedWhite(color)
 
         if let cell = button.cell as? NSButtonCell {
             let cellColor = cell.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-            assertColorIsWhite(cellColor)
+            assertColorIsNotForcedWhite(cellColor)
         } else {
             XCTFail("Expected NSButtonCell")
         }
     }
 
-    func testSetRemainingRendersWhiteTimerTextLayer() {
+    func testSetRemainingDoesNotRenderCustomTimerTextLayer() {
         let controller = MenuBarController()
         controller.setRemaining(seconds: 90)
 
@@ -64,17 +64,10 @@ final class MenuBarControllerTests: XCTestCase {
             return
         }
 
-        guard let textLayer = findTimerTextLayer(in: button.layer) else {
-            XCTFail("Expected timer text layer")
-            return
-        }
-
-        XCTAssertEqual(textLayer.string as? String, "01:30")
-        let layerColor = textLayer.foregroundColor.flatMap(NSColor.init(cgColor:))
-        assertColorIsWhite(layerColor)
+        XCTAssertNil(findTimerTextLayer(in: button.layer))
     }
 
-    func testSetRemainingForcesDarkStatusButtonAppearance() {
+    func testSetRemainingDoesNotForceDarkStatusButtonAppearance() {
         let controller = MenuBarController()
         controller.setRemaining(seconds: 90)
 
@@ -83,10 +76,10 @@ final class MenuBarControllerTests: XCTestCase {
             return
         }
 
-        XCTAssertEqual(button.appearance?.name, .vibrantDark)
+        XCTAssertNotEqual(button.appearance?.name, .vibrantDark)
     }
 
-    func testSetRemainingUsesNonTemplateStatusImage() {
+    func testSetRemainingUsesTemplateStatusImage() {
         let controller = MenuBarController()
         controller.setRemaining(seconds: 90)
 
@@ -95,7 +88,7 @@ final class MenuBarControllerTests: XCTestCase {
             return
         }
 
-        XCTAssertEqual(button.image?.isTemplate, false)
+        XCTAssertEqual(button.image?.isTemplate, true)
     }
 
     func testFallbackStatusIconUsesImageInsteadOfEmojiTitle() {
@@ -112,6 +105,7 @@ final class MenuBarControllerTests: XCTestCase {
 
         XCTAssertNotEqual(button.title, "🍅")
         XCTAssertNotNil(button.image)
+        XCTAssertEqual(button.image?.isTemplate, true)
     }
 
     private func statusButton(from controller: MenuBarController) -> NSStatusBarButton? {
@@ -122,19 +116,24 @@ final class MenuBarControllerTests: XCTestCase {
         return statusItem.button
     }
 
-    private func assertColorIsWhite(
+    private func assertColorIsNotForcedWhite(
         _ color: NSColor?,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        guard let rgbColor = color?.usingColorSpace(.deviceRGB) else {
+        guard let color else {
+            return
+        }
+
+        guard let rgbColor = color.usingColorSpace(.deviceRGB) else {
             XCTFail("Expected color in RGB space", file: file, line: line)
             return
         }
 
-        XCTAssertEqual(rgbColor.redComponent, 1.0, accuracy: 0.001, file: file, line: line)
-        XCTAssertEqual(rgbColor.greenComponent, 1.0, accuracy: 0.001, file: file, line: line)
-        XCTAssertEqual(rgbColor.blueComponent, 1.0, accuracy: 0.001, file: file, line: line)
+        let isWhite = abs(rgbColor.redComponent - 1.0) < 0.001
+            && abs(rgbColor.greenComponent - 1.0) < 0.001
+            && abs(rgbColor.blueComponent - 1.0) < 0.001
+        XCTAssertFalse(isWhite, file: file, line: line)
     }
 
     private func findTimerTextLayer(in layer: CALayer?) -> CATextLayer? {

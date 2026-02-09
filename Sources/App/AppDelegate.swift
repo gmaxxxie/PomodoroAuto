@@ -6,7 +6,7 @@ import os.log
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "PomodoroAuto", category: "AppDelegate")
-    static let shouldRequestAccessibilityAccessOnLaunch = false
+    static let shouldRequestAccessibilityAccessOnLaunch = true
     static let shouldRequestNotificationAuthorizationOnLaunch = false
     private enum SessionState {
         case idle

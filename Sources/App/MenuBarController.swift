@@ -43,7 +43,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var totalDuration: Int = 25 * 60
     private var progressLayer: CAShapeLayer?
     private var backgroundLayer: CAShapeLayer?
-    private var timerTextLayer: CATextLayer?
     private static func loadBundledStatusIcon() -> NSImage? {
         guard let url = Bundle.module.url(forResource: "menubar-icon-template", withExtension: "pdf"),
               let image = NSImage(contentsOf: url) else {
@@ -77,7 +76,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         leafPath.close()
         leafPath.fill()
 
-        image.isTemplate = false
+        image.isTemplate = true
         return image
     }
 
@@ -85,7 +84,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let image = customStatusIconLoader() else {
             return nil
         }
-        image.isTemplate = false
+        image.isTemplate = true
         image.size = NSSize(width: Layout.iconSize, height: Layout.iconSize)
         return image
     }()
@@ -174,23 +173,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func setStatusButtonTitle(_ text: String) {
         guard let button = statusItem.button else { return }
-        if #available(macOS 10.14, *) {
-            button.appearance = NSAppearance(named: .vibrantDark)
-        }
-        button.title = timerTextLayer == nil ? text : ""
-        if #available(macOS 10.14, *) {
-            let attributedTitle = NSAttributedString(
-                string: text,
-                attributes: [.foregroundColor: NSColor.white]
-            )
-            button.attributedTitle = attributedTitle
-            if let cell = button.cell as? NSButtonCell {
-                cell.attributedTitle = attributedTitle
-            }
-        }
-        if let timerTextLayer {
-            timerTextLayer.string = text
-            timerTextLayer.isHidden = text.isEmpty
+        button.title = text
+        let attributedTitle = NSAttributedString(string: text)
+        button.attributedTitle = attributedTitle
+        if let cell = button.cell as? NSButtonCell {
+            cell.attributedTitle = attributedTitle
         }
         updateProgressRingPosition()
     }
@@ -214,9 +201,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             setStatusButtonTitle("")
         }
 
-        if #available(macOS 10.14, *) {
-            button.contentTintColor = .white
-        }
+        button.contentTintColor = nil
     }
 
     private func setupProgressRing() {
@@ -256,19 +241,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         progLayer.isHidden = true
         progressLayer = progLayer
 
-        let textLayer = CATextLayer()
-        textLayer.foregroundColor = NSColor.white.cgColor
-        textLayer.fontSize = 12
-        textLayer.alignmentMode = .left
-        textLayer.truncationMode = .none
-        textLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 2
-        textLayer.string = ""
-        textLayer.isHidden = true
-        timerTextLayer = textLayer
-        
         button.layer?.addSublayer(bgLayer)
         button.layer?.addSublayer(progLayer)
-        button.layer?.addSublayer(textLayer)
         
         updateProgressRingPosition()
     }
@@ -296,18 +270,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         CATransaction.setDisableActions(true)
         bgLayer.frame.origin = CGPoint(x: xOffset, y: yOffset)
         progLayer.frame.origin = CGPoint(x: xOffset, y: yOffset)
-        if let timerTextLayer {
-            let textX = xOffset + ringSize + 5
-            let textHeight: CGFloat = 14
-            let textWidth = max(0, buttonBounds.width - textX - 4)
-            timerTextLayer.frame = CGRect(
-                x: textX,
-                y: (buttonBounds.height - textHeight) / 2,
-                width: textWidth,
-                height: textHeight
-            )
-            timerTextLayer.contentsScale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        }
         CATransaction.commit()
     }
 
