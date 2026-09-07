@@ -9,6 +9,7 @@ final class SettingsStore {
         static let whitelistBundleIds = "whitelistBundleIds"
         static let autoStartBundleIds = "autoStartBundleIds"
         static let languagePreference = "languagePreference"
+        static let timerDisplayMode = "timerDisplayMode"
     }
 
     private let defaults: UserDefaults
@@ -22,7 +23,8 @@ final class SettingsStore {
             Keys.fullscreenNonWork: true,
             Keys.whitelistBundleIds: [],
             Keys.autoStartBundleIds: [],
-            Keys.languagePreference: LanguagePreference.system.rawValue
+            Keys.languagePreference: LanguagePreference.system.rawValue,
+            Keys.timerDisplayMode: TimerDisplayMode.timerAndProgress.rawValue
         ])
     }
 
@@ -64,6 +66,14 @@ final class SettingsStore {
         set { defaults.set(newValue.rawValue, forKey: Keys.languagePreference) }
     }
 
+    var timerDisplayMode: TimerDisplayMode {
+        get {
+            let raw = defaults.string(forKey: Keys.timerDisplayMode) ?? TimerDisplayMode.timerAndProgress.rawValue
+            return TimerDisplayMode(rawValue: raw) ?? .timerAndProgress
+        }
+        set { defaults.set(newValue.rawValue, forKey: Keys.timerDisplayMode) }
+    }
+
     var ruleConfig: RuleConfig {
         RuleConfig(
             fullscreenNonWork: fullscreenNonWork,
@@ -80,5 +90,6 @@ final class SettingsStore {
         defaults.removeObject(forKey: Keys.whitelistBundleIds)
         defaults.removeObject(forKey: Keys.autoStartBundleIds)
         defaults.removeObject(forKey: Keys.languagePreference)
+        defaults.removeObject(forKey: Keys.timerDisplayMode)
     }
 }

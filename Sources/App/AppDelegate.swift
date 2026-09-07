@@ -6,7 +6,7 @@ import os.log
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "PomodoroAuto", category: "AppDelegate")
-    static let shouldRequestAccessibilityAccessOnLaunch = true
+    static let shouldRequestAccessibilityAccessOnLaunch = false
     static let shouldRequestNotificationAuthorizationOnLaunch = false
     private enum SessionState {
         case idle
@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         self.breakTimer = PomodoroTimer(durationSeconds: settings.breakMinutes * 60)
         self.menuBar = MenuBarController()
         super.init()
+        menuBar.setDisplayMode(settings.timerDisplayMode)
         menuBar.statsProvider = { [weak self] in
             guard let self else { return MenuBarController.TodayStats(pomodoroCount: 0, workSeconds: 0) }
             let stats = self.statsStore.statsForToday()
@@ -476,6 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         workTimer.setDuration(seconds: settings.workMinutes * 60)
         breakTimer.setDuration(seconds: settings.breakMinutes * 60)
+        menuBar.setDisplayMode(settings.timerDisplayMode)
         applyLocalization()
         updateStatusTextForCurrentState()
     }

@@ -3,6 +3,8 @@
 "menu.status.done" = "完成";
 "menu.status.remaining" = "剩余";
 "menu.status.break" = "休息";
+"menu.status.workProgress" = "工作进行中";
+"menu.status.breakProgress" = "休息进行中";
 "menu.title.startPause" = "开始/暂停";
 "menu.title.reset" = "重置";
 "menu.title.stats" = "统计";
@@ -35,6 +37,9 @@
 "settings.section.timing" = "计时";
 "settings.workMinutes" = "工作时长（分钟）";
 "settings.breakMinutes" = "休息时长（分钟）";
+"settings.timerDisplayMode" = "菜单栏显示模式";
+"settings.timerDisplayMode.timerAndProgress" = "倒计时 + 进度";
+"settings.timerDisplayMode.progressOnly" = "仅进度";
 "settings.section.autoStart" = "自动开始";
 "settings.autoStart" = "自动开始/暂停";
 "settings.autoStartAllowlist" = "自动开始白名单（逗号分隔）";

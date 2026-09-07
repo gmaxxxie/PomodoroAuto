@@ -108,12 +108,54 @@ final class MenuBarControllerTests: XCTestCase {
         XCTAssertEqual(button.image?.isTemplate, true)
     }
 
+    func testProgressOnlyModeHidesCountdownTextOnStatusButton() {
+        let controller = MenuBarController()
+        controller.setDisplayMode(.progressOnly)
+        controller.setRemaining(seconds: 90)
+
+        guard let button = statusButton(from: controller) else {
+            XCTFail("Expected status button to exist")
+            return
+        }
+
+        XCTAssertEqual(button.title, "")
+        XCTAssertEqual(button.attributedTitle.string, "")
+    }
+
+    func testProgressOnlyModeUsesProgressStatusTextInMenu() {
+        let controller = MenuBarController()
+        controller.setDisplayMode(.progressOnly)
+        controller.setRemaining(seconds: 90)
+
+        XCTAssertEqual(menuStatusTitle(from: controller), Localization.localized("menu.status.workProgress"))
+    }
+
+    func testSwitchingBackToTimerAndProgressModeShowsCountdownText() {
+        let controller = MenuBarController()
+        controller.setDisplayMode(.progressOnly)
+        controller.setRemaining(seconds: 90)
+        controller.setDisplayMode(.timerAndProgress)
+        controller.setRemaining(seconds: 90)
+
+        guard let button = statusButton(from: controller) else {
+            XCTFail("Expected status button to exist")
+            return
+        }
+
+        XCTAssertEqual(button.title, "01:30")
+    }
+
     private func statusButton(from controller: MenuBarController) -> NSStatusBarButton? {
         let mirror = Mirror(reflecting: controller)
         guard let statusItem = mirror.children.first(where: { $0.label == "statusItem" })?.value as? NSStatusItem else {
             return nil
         }
         return statusItem.button
+    }
+
+    private func menuStatusTitle(from controller: MenuBarController) -> String? {
+        let mirror = Mirror(reflecting: controller)
+        return (mirror.children.first(where: { $0.label == "statusTitleItem" })?.value as? NSMenuItem)?.title
     }
 
     private func assertColorIsNotForcedWhite(

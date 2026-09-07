@@ -135,6 +135,26 @@ final class SettingsWindowTests: XCTestCase {
         XCTAssertEqual(store.workMinutes, 30)
         XCTAssertEqual(store.breakMinutes, 10)
     }
+
+    func testSaveUpdatesTimerDisplayMode() {
+        guard let popup = findPopUpButton(menuTitle: "timerDisplayMode") else {
+            XCTFail("Could not find timer display mode popup")
+            return
+        }
+
+        guard let progressOnlyItem = popup.itemArray.first(where: {
+            ($0.representedObject as? TimerDisplayMode) == .progressOnly
+        }) else {
+            XCTFail("Could not find progress-only display mode option")
+            return
+        }
+        popup.select(progressOnlyItem)
+
+        let saveSelector = Selector("handleSave")
+        controller.perform(saveSelector)
+
+        XCTAssertEqual(store.timerDisplayMode, .progressOnly)
+    }
     
     func testSaveUpdatesAutoStartBundleIds() {
         let textField = findTextField(placeholder: "com.apple.Terminal, com.apple.dt.Xcode")
@@ -203,6 +223,25 @@ final class SettingsWindowTests: XCTestCase {
         
         let breakField = findTextField(in: testController.window?.contentView, placeholder: "5")
         XCTAssertEqual(breakField?.stringValue, "15")
+    }
+
+    func testLoadValuesSelectsSavedTimerDisplayMode() {
+        store.timerDisplayMode = .progressOnly
+
+        let testController = SettingsWindowController(settings: store, statsStore: statsStore, onSave: {})
+        _ = testController.window
+
+        guard let contentView = testController.window?.contentView else {
+            XCTFail("Could not find content view")
+            return
+        }
+
+        guard let popup = findPopUpButton(in: contentView, menuTitle: "timerDisplayMode") else {
+            XCTFail("Could not find timer display mode popup")
+            return
+        }
+
+        XCTAssertEqual(popup.selectedItem?.representedObject as? TimerDisplayMode, .progressOnly)
     }
     
     func testLoadValuesPopulatesAutoStartApps() {

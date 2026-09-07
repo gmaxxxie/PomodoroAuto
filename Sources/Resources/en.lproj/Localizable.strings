@@ -3,6 +3,8 @@
 "menu.status.done" = "Done";
 "menu.status.remaining" = "Remaining";
 "menu.status.break" = "Break";
+"menu.status.workProgress" = "Work in progress";
+"menu.status.breakProgress" = "Break in progress";
 "menu.title.startPause" = "Start/Pause";
 "menu.title.reset" = "Reset";
 "menu.title.stats" = "Stats";
@@ -35,6 +37,9 @@
 "settings.section.timing" = "Timing";
 "settings.workMinutes" = "Work minutes";
 "settings.breakMinutes" = "Break minutes";
+"settings.timerDisplayMode" = "Menu bar display mode";
+"settings.timerDisplayMode.timerAndProgress" = "Timer + progress";
+"settings.timerDisplayMode.progressOnly" = "Progress only";
 "settings.section.autoStart" = "Auto Start";
 "settings.autoStart" = "Auto start/pause";
 "settings.autoStartAllowlist" = "Auto-start allowlist (comma-separated)";

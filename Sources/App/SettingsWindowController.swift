@@ -13,6 +13,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
 
     private let workMinutesField = NSTextField()
     private let breakMinutesField = NSTextField()
+    private let timerDisplayModePopup = NSPopUpButton()
     private let autoStartCheckbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let autoStartAppsField = NSTextField()
     private let autoStartAppPopup = NSPopUpButton()
@@ -182,8 +183,28 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
         fieldsStack.addArrangedSubview(breakRow)
 
         section.addArrangedSubview(fieldsStack)
+        section.addArrangedSubview(createTimerDisplayModeRow())
 
         return section
+    }
+
+    private func createTimerDisplayModeRow() -> NSStackView {
+        let row = NSStackView()
+        row.orientation = .vertical
+        row.alignment = .leading
+        row.spacing = 6
+
+        let label = NSTextField(labelWithString: Localization.localized("settings.timerDisplayMode"))
+        label.font = NSFont.systemFont(ofSize: 12)
+        label.textColor = .secondaryLabelColor
+        row.addArrangedSubview(label)
+
+        configureTimerDisplayModePopup()
+        timerDisplayModePopup.controlSize = .regular
+        timerDisplayModePopup.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        row.addArrangedSubview(timerDisplayModePopup)
+
+        return row
     }
 
     private func createLanguageSection() -> NSStackView {
@@ -525,6 +546,18 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
         languagePopup.lastItem?.representedObject = LanguagePreference.chineseSimplified
     }
 
+    private func configureTimerDisplayModePopup() {
+        timerDisplayModePopup.removeAllItems()
+
+        timerDisplayModePopup.addItem(withTitle: Localization.localized("settings.timerDisplayMode.timerAndProgress"))
+        timerDisplayModePopup.lastItem?.representedObject = TimerDisplayMode.timerAndProgress
+
+        timerDisplayModePopup.addItem(withTitle: Localization.localized("settings.timerDisplayMode.progressOnly"))
+        timerDisplayModePopup.lastItem?.representedObject = TimerDisplayMode.progressOnly
+
+        timerDisplayModePopup.menu?.title = "timerDisplayMode"
+    }
+
     private func selectLanguagePreference(_ preference: LanguagePreference) {
         let index = languagePopup.itemArray.firstIndex { item in
             guard let value = item.representedObject as? LanguagePreference else { return false }
@@ -541,6 +574,24 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
             return .system
         }
         return preference
+    }
+
+    private func selectTimerDisplayMode(_ mode: TimerDisplayMode) {
+        let index = timerDisplayModePopup.itemArray.firstIndex { item in
+            guard let value = item.representedObject as? TimerDisplayMode else { return false }
+            return value == mode
+        }
+        if let index {
+            timerDisplayModePopup.selectItem(at: index)
+        }
+    }
+
+    private func timerDisplayModeSelection() -> TimerDisplayMode {
+        guard let item = timerDisplayModePopup.selectedItem,
+              let mode = item.representedObject as? TimerDisplayMode else {
+            return .timerAndProgress
+        }
+        return mode
     }
 
     private func configureMenuSearchField(_ field: NSSearchField) {
@@ -749,6 +800,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
         fullscreenRuleCheckbox.state = settings.fullscreenNonWork ? .on : .off
         whitelistField.stringValue = settings.whitelistBundleIds.joined(separator: ", ")
         selectLanguagePreference(settings.languagePreference)
+        selectTimerDisplayMode(settings.timerDisplayMode)
         populateInstalledApps(into: autoStartAppPopup, filter: autoStartSearchField.stringValue)
         populateInstalledApps(into: whitelistAppPopup, filter: whitelistSearchField.stringValue)
         updateChips(for: autoStartChipsContainer, bundleIds: bundleIds(from: autoStartAppsField))
@@ -766,6 +818,7 @@ final class SettingsWindowController: NSWindowController, NSMenuDelegate, NSWind
         settings.autoStartBundleIds = bundleIds(from: autoStartAppsField)
         settings.whitelistBundleIds = bundleIds(from: whitelistField)
         settings.languagePreference = languagePreferenceSelection()
+        settings.timerDisplayMode = timerDisplayModeSelection()
 
         onSave()
         window?.close()

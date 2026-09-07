@@ -39,7 +39,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var statsItem: NSMenuItem?
     private var settingsItem: NSMenuItem?
     private var quitItem: NSMenuItem?
+    private var displayMode: TimerDisplayMode = .timerAndProgress
     private var currentMode: TimerMode = .idle
+    private var currentRemainingSeconds: Int?
+    private var currentRemainingLabel: String?
     private var totalDuration: Int = 25 * 60
     private var progressLayer: CAShapeLayer?
     private var backgroundLayer: CAShapeLayer?
@@ -145,19 +148,26 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         totalDuration = max(1, seconds)
     }
 
+    func setDisplayMode(_ mode: TimerDisplayMode) {
+        displayMode = mode
+        if currentMode == .work || currentMode == .rest {
+            updateRunningStatusText()
+        }
+    }
+
     func setRemaining(seconds: Int, label: String? = nil, isBreak: Bool = false) {
-        let minutes = seconds / 60
-        let secs = seconds % 60
-        let text = String(format: "%02d:%02d", minutes, secs)
-        setStatusButtonTitle(text)
         let resolvedLabel = label ?? Localization.localized("menu.status.remaining")
-        statusTitleItem.title = "\(resolvedLabel): \(text)"
+        currentRemainingSeconds = max(0, seconds)
+        currentRemainingLabel = resolvedLabel
         currentMode = isBreak ? .rest : .work
+        updateRunningStatusText()
         updateStatusIcon(isRunning: true)
         updateProgressRing(remaining: seconds)
     }
 
     func setStatus(text: String, mode: TimerMode) {
+        currentRemainingSeconds = nil
+        currentRemainingLabel = nil
         setStatusButtonTitle("")
         statusTitleItem.title = text
         currentMode = mode
@@ -271,6 +281,29 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         bgLayer.frame.origin = CGPoint(x: xOffset, y: yOffset)
         progLayer.frame.origin = CGPoint(x: xOffset, y: yOffset)
         CATransaction.commit()
+    }
+
+    private func updateRunningStatusText() {
+        guard let seconds = currentRemainingSeconds else { return }
+
+        switch displayMode {
+        case .timerAndProgress:
+            let minutes = seconds / 60
+            let secs = seconds % 60
+            let text = String(format: "%02d:%02d", minutes, secs)
+            setStatusButtonTitle(text)
+            let resolvedLabel = currentRemainingLabel ?? Localization.localized("menu.status.remaining")
+            statusTitleItem.title = "\(resolvedLabel): \(text)"
+        case .progressOnly:
+            setStatusButtonTitle("")
+            let progressTitle: String
+            if currentMode == .rest {
+                progressTitle = Localization.localized("menu.status.breakProgress")
+            } else {
+                progressTitle = Localization.localized("menu.status.workProgress")
+            }
+            statusTitleItem.title = progressTitle
+        }
     }
 
     private func updateProgressRing(remaining: Int) {

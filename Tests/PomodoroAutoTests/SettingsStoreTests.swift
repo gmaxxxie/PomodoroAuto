@@ -21,4 +21,27 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertFalse(store.autoStart)
     }
+
+    func testDefaultTimerDisplayModeIsTimerAndProgress() {
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(store.timerDisplayMode, .timerAndProgress)
+    }
+
+    func testTimerDisplayModeCanBePersisted() {
+        let store = SettingsStore(defaults: defaults)
+
+        store.timerDisplayMode = .progressOnly
+
+        XCTAssertEqual(store.timerDisplayMode, .progressOnly)
+    }
+
+    func testResetToDefaultsRestoresTimerDisplayMode() {
+        let store = SettingsStore(defaults: defaults)
+        store.timerDisplayMode = .progressOnly
+
+        store.resetToDefaults()
+
+        XCTAssertEqual(store.timerDisplayMode, .timerAndProgress)
+    }
 }

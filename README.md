@@ -148,3 +148,4 @@ git push origin v0.1.3
 
 - 配置和统计数据存储在 `UserDefaults`
 - 历史缓存最多保留 1000 条或 24 小时
+
