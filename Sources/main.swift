@@ -7,6 +7,3 @@ app.setActivationPolicy(.accessory)
 app.run()
 
 
-func hardcodedCredential() -> String {
-    return "sk-live-1234567890abcdef"  // sensitive hardcoded
-}
